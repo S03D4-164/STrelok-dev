@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}
+<title>Timeline</title>
+{% endblock %}
+
+{% block datatableslib %}{% endblock %}
+{% block jqeury %}
+{% endblock %}
+
+{% block container %}
+
+<div class="col-md-12">
+<div class="panel panel-primary">
+<div class="panel-heading">Timeline</div>
+<div class="panel-body">
+
+<div class="col-md-10" id="visualization" ></div>
+
+<!--
+<div class="col-md-2">
+<form method=post>{% csrf_token %}
+<div id="types_form">
+<h4><input type="checkbox" id="select_types" checked>Select Objects</input></h4>
+{% for id, name in form.objects.field.choices %}
+{% ifequal name "report" %}
+<input type="checkbox" id="{{name}}" name="objects" value="{{id}}" checked>
+{{name}}
+</input>
+<ul>
+<input type="checkbox" id="published" name="published" value="{{id}}" checked>published</input>
+</ul>
+{% else %}
+<input type="checkbox" id="{{name}}" name="objects" value="{{id}}" checked>{{name}}</input>
+<ul>
+<li><input type="checkbox" id="first_seen" name="first_seen" value="{{id}}" checked>first_seen</input></li>
+<li><input type="checkbox" id="last_seen" name="last_seen" value="{{id}}" checked>last_seen</input></li>
+</ul>
+{% endifequal %}
+{% endfor %}
+</div>
+<input type="submit">
+</form>
+</div>
+-->
+
+</div><!--/panel-body-->
+</div><!--/panel-->
+</div>
+
+<script type="text/javascript">
+var groups = new vis.DataSet();
+groups.add([{% for g in groups %}
+{
+    id: "{{g.id}}",
+    content: "{{g.content}}",
+},
+{% endfor %}]);
+
+var items = new vis.DataSet();
+items.add([{% for i in items %}
+{
+    id: "{{i.id}}",
+    content: "{{i.content}}",
+    group: "{{i.group}}",
+    subgroup: "{{i.subgroup}}",
+    className: "{{i.className}}",
+    start: "{{i.start}}",
+    {% if i.end %}end: "{{i.end}}",{% endif %}
+},
+{% endfor %}]);
+
+var container = document.getElementById('visualization');
+var options = {
+    align: 'left',
+    orientation: 'top',
+    //horizontalScroll:true,
+};
+var timeline = new vis.Timeline(container, items, groups, options);
+</script>
+</div>
+{% endblock%}

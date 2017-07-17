@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}
+<title>STIX Defined Relationships</title>
+{% endblock %}
+
+{% block jquery %}
+<script>
+function drawvis(){
+    var data = $("form").serialize();
+    $.ajax({
+            type: 'POST',
+            url: '/data/drs/',
+            data: data,
+            success: function(result){
+                var network = visNetwork(
+                    result["nodes"],
+                    result["edges"]
+                );
+                network.redraw();
+            }
+    });
+};
+$(document).ready(
+    function(){
+        drawvis();
+        $("input#select_types").click(function(){
+            if($(this).prop("checked")){
+                $('ul#id_types :checkbox').prop('checked',true);
+            }else{
+                $('ul#id_types :checkbox').prop('checked',false);
+            };
+        });
+        $("input#select_relation").click(function(){
+            if($(this).prop("checked")){
+                $('ul#id_relation :checkbox').prop('checked',true);
+            }else{
+                $('ul#id_relation :checkbox').prop('checked',false);
+            };
+        });
+        $("input").change(function(){
+            drawvis();
+        });
+    }
+);
+</script>
+{% endblock %}
+
+{% block container %}
+
+<div class="col-md-12">
+<div class="panel panel-primary">
+<div class="panel-heading">STIX Defined Relationships</div>
+<div class="panel-body">
+
+<div class="col-md-7" style="margin: 0 auto;height:500px" id="network" ></div>
+
+<div class="col-md-5" >
+<form method=post>{% csrf_token %}
+<div class="col-md-7" id="types_form">
+<input type="checkbox" id="select_types" checked>types</input>
+{{tsform.types}}
+</div>
+<div class="col-md-5" id="rel_form">
+<input type="checkbox" id="select_relation" checked>relationship</input>
+{{tsform.relation}}
+</div>
+</form>
+</div>
+
+</div><!--/panel-body-->
+</div><!--/panel-->
+</div>
+
+<!--
+<script type="text/javascript">
+var nodes = [
+{% for n in nodes %}{
+	'id':'{{n.id}}',
+	'label':'{{n.label}}',
+	'group':'{{n.group}}',
+	'title': '<table>{% for t in n.title %}<tr><td>{{t|escapejs}}</td></tr>{% endfor %}</table>',
+},
+{% endfor %}];
+
+var edges = [
+{% for e in edges %}{
+	'from':'{{e.from}}',
+	'to':'{{e.to}}',
+	'label':'{{e.label}}',
+	'title': '<table>{% for t in e.title %}<tr><td>{{t|escapejs}}</td></tr>{% endfor %}</table>',
+},
+{% endfor %}];
+var network = visNetwork(nodes, edges);
+</script>
+-->
+</div>
+{% endblock%}

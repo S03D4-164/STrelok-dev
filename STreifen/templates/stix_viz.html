@@ -1,0 +1,21 @@
+{% extends "stix_view.html" %}
+
+{% block table %}
+<div id="tables" class="col-md-12">
+
+<div class="panel panel-primary">
+<div class="panel-heading">STIX</div>
+<div class="panel-body">
+
+
+<form method="POST">{% csrf_token %}
+<button type="button" id="viz" onclick=toggleViz("stixtext") >Vizualize</button>
+<input type="submit" name="timeline" value="Timeline">
+<textarea id="stixtext" name="input" style="height:400px;">{{stix}}</textarea>
+</form>
+
+</div><!--/.panel-body-->
+</div><!--/.panel-->
+</div><!--/tables-->
+{% endblock %}
+

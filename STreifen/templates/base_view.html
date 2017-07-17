@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+
+{% block title %}
+<title>{{obj.object_type.name|capfirst}}:{{obj.name}}</title>
+{% endblock %}
+
+{% block datetimepickerlib %}{% endblock %}
+
+{% block jquery %}
+<link rel="stylesheet" type="text/css" href="/static/stixviz/app.css" /> 
+<script>
+$(document).ready(
+    function(){
+        //$("button#viz").click(function(){
+        //    toggleViz("stixtext");
+        //});
+        $("select#id_type").change(function(){
+            var parent = $(this).parent();
+            $.ajax({
+                type: 'POST',
+                data: {
+                    select:$(this).val(),
+                    csrfmiddlewaretoken:'{{csrf_token}}',
+                },
+                success: function(result){
+                    //console.log(parent);
+                    if (parent.is("div#select_create")){
+                        cform = $(result).find("#create_object");
+                        $("#create_object").replaceWith(cform);
+                    }else if (parent.is("div#select_add")){
+                        aform = $(result).find("#add_object");
+                        $("#add_object").replaceWith(aform);
+                    }else if (parent.is("div#filter")){
+                        table = $(result).find("tbody#objects_table");
+                        console.log(table);
+                        $("tbody#objects_table").replaceWith(table);
+                    };
+                }
+            });
+        });
+        //$('#id_published').datetimepicker({format:'Y-m-d H:i'});
+        //$('#id_first_seen').datetimepicker({format:'Y-m-d H:i'});
+        //$('#id_last_seen').datetimepicker({format:'Y-m-d H:i'});
+    }
+);
+</script>
+{% endblock%}
+
+{% block container %}
+
+{% block delete %}
+<div class="modal" id="delete_form" role="dialog">
+<div class="modal-dialog"><div class="modal-content">
+<div class="modal-header">
+<button type="button" class="close" data-dismiss="modal">&times;</button>
+<h4 class="modal-title">Delete</h4>
+</div>
+<div class="modal-body">
+<h3>Are you sure?</h3>
+<form method="post">{% csrf_token %}
+<input class="btn btn-xs btn-danger" type="submit" name="delete" value="Yes, Delete">
+<button class="btn btn-md btn-primary" data-dismiss="modal">No, Close</button>
+</form>
+</div><!--/.modal-body-->
+</div><!--/.modal-content-->
+</div><!--/.modal-dialog-->
+</div><!--/.modal-->
+{% endblock %}
+
+{% block modal %}
+<div class="modal" id="add_form" role="dialog">
+<div class="modal-dialog"><div class="modal-content">
+<div class="modal-header">
+<button type="button" class="close" data-dismiss="modal">&times;</button>
+<h4 class="modal-title">Add Object</h4>
+</div>
+<div class="modal-body">
+<form method="post">{% csrf_token %}
+<div id="add_object">
+<table>{{aoform.as_table}}</table>
+</div>
+<input class="btn btn-primary btn-sm" type="submit" name="add_obj" value="Add">
+</form>
+</div><!--/.modal-body-->
+</div><!--/.modal-content-->
+</div><!--/.modal-dialog-->
+</div><!--/.modal-->
+
+<div class="modal" id="create_form" role="dialog">
+<div class="modal-dialog"><div class="modal-content">
+<div class="modal-header">
+<button type="button" class="close" data-dismiss="modal">&times;</button>
+<h4 class="modal-title">Create Object</h4>
+</div>
+<div class="modal-body">
+<form method="post">{% csrf_token %}
+<div id="select_create">Select:{{soform.type}}</div>
+<br>
+<div id="create_object" >
+{% if coform %}
+<table class="table">
+{{coform.as_table}}
+</table>
+<input class="btn btn-info btn-sm" type="submit" name="create_obj" value="Create">
+{% endif %}
+</div><!--/#create_form-->
+</form>
+</div><!--/.modal-body-->
+</div><!--/.modal-content-->
+</div><!--/.modal-dialog-->
+</div><!--/.modal-->
+{% endblock %}
+
+{% block edit %}
+<div class="modal" id="obj_form" role="dialog">
+<div class="modal-dialog"><div class="modal-content">
+<div class="modal-header">
+<button type="button" class="close" data-dismiss="modal">&times;</button>
+<h4 class="modal-title">Edit Report</h4>
+</div>
+<div class="modal-body">
+<form method="post">{% csrf_token %}
+<table class="table">
+{{form.as_table}}
+</table>
+<input class="btn btn-primary btn-sm" type="submit" name="update" value="Update">
+</form>
+</div><!--/.modal-body-->
+</div><!--/.modal-content-->
+</div><!--/.modal-dialog-->
+</div><!--/.modal-->
+{% endblock %}
+
+<div id="view" class="col-md-12">
+
+{% block top_pane %}
+<div id="obj_panel" class="panel panel-primary">
+<div class="panel-heading">
+<h4>
+<a class="btn btn-default btn-xs" href="">{{obj.id}}</a>
+<a class="btn btn-warning btn-xs" data-toggle="modal" href="#obj_form">Edit</a>
+<a data-toggle="collapse" href="#obj_body" style="color:white">
+{{obj.name}} ({{obj.object_id}})
+</a>
+<a class="btn btn-danger btn-xs" data-toggle="modal" href="#delete_form">Delete</a>
+</h4>
+</div><!--.panel-heading-->
+
+<div id="obj_body" class="panel-collapse collapse ">
+
+<div class="panel-body">
+
+<table class="table table-condensed">
+<tr><th class="col-md-3">Created / Modified</th><td>{{obj.created}} / {{obj.modified}}</td></tr>
+<tr><th class="col-md-3">Labels</th>
+<td>
+{% for l in obj.labels.all %}
+{{l.value}}<br>
+{% endfor %}
+</td></tr>
+
+{% block property %}
+{% ifequal obj.object_type.name "report"%}
+<tr><th >Published</th><td>{{obj.published}}</td></tr>
+{% endifequal %}
+{% endblock %}
+
+<tr>
+<th class="col-md-3">Description</th>
+<td><pre>{{obj.description}}</pre></td>
+</tr>
+</table>
+
+</div><!--/.panel-body-->
+</div><!--/.collapse-->
+</div><!--/.panel-->
+{% endblock %}
+
+{% block middle_pane %}
+
+<div id="canvas-container" class="hidden">
+
+<div class="panel panel-primary">
+<div class="panel-heading">
+<h1 id="header">Vizualize</h1>
+</div>
+
+<div class="panel-body">
+
+<div id="canvas-wrapper"><svg id="canvas"></svg></div>
+
+<div id="legend" class="sidebar">
+<h2>Legend</h2>
+<ul id="legend-content"></ul>
+</div>
+
+<div id="selected" class="sidebar">
+<h2>Selected Node</h2>
+<div id="selection"></div>
+</div><!--/#selected-->
+
+</div><!--/.panel-body-->
+</div><!--/.panel-->
+</div><!--/#canvas-container-->
+
+{% if stix %}
+<div id="stix_panel" class="panel panel-primary">
+<div class="panel-heading">
+<a data-toggle="collapse" href="#stix_body" style="color:white">
+STIX
+</a>
+</div>
+<div id="stix_body" class="panel-collapse collapse ">
+<div class="panel-body">
+{% if obj %}<a class="btn btn-primary btn-xs" href="/stix/{{obj.object_id.object_id}}.json">Full</a>{% endif %}
+<button class="btn btn-primary btn-xs" id="viz" onclick=toggleViz("stixtext")>Vizualize</button>
+<textarea id="stixtext" read-only style="height:500px;">{{stix}}</textarea>
+</div><!--/.panel_body-->
+</div><!--/#stix_body-->
+</div><!--/#stix_panel-->
+{% endif %}
+
+{% endblock %}
+
+{% block bottom_pane %}
+
+<ul class="nav nav-pills">
+<li class="active"><a data-toggle="tab" href="#rel_table">Relations</a></li>
+<li><a data-toggle="tab" href="#sight_table">Sightings</a></li>
+<li ><a data-toggle="tab" href="#obj_table">Objects</a></li>
+</ul>
+<div class="panel panel-primary">
+<div class="panel-heading"></div>
+<div class="panel-body">
+{% if obj.object_type.name == "identity" %}
+<a class="btn btn-primary btn-xs" data-toggle="modal" href="#sight_form">Sighting</a>
+{% else %}
+<a class="btn btn-primary btn-xs" data-toggle="modal" href="#add_form">Add</a>
+{% endif %}
+<a class="btn btn-info btn-xs" data-toggle="modal" href="#create_form">Create</a>
+<a class="btn btn-warning btn-xs" data-toggle="modal" href="#detach_form">Detach</a>
+
+
+<div class="tab-content">
+
+<div class="tab-pane" id="sight_table" >
+<table class="table table-condensed table-stripe table-hover display" width="100%">
+<thead><tr>
+<th class="col-sm-1">ID</th>
+<th class="col-sm-2">First seen</th>
+<th class="col-sm-2">Last seen</th>
+<th class="col-sm-2">Where Sighted</th>
+<th class="col-sm-2">Sighting of</th>
+<th class="col-sm-4">Object ID</th>
+</tr></thead>
+<tbody id=sightings_table>
+{% for s in sights %}
+<tr>
+<td><a class="btn btn-primary btn-xs">{{s.id}}</a></td>
+<td>{{s.first_seen|date:"c"}}</td>
+<td>{{s.last_seen|date:"c"}}</td>
+<td>
+{% for r in s.where_sighted_refs.all %}
+{% for o in objects %}
+{% ifequal o.object_id r %}
+{{o.name}}<br>
+{% endifequal %}
+{% endfor %}
+{% endfor %}
+</td>
+<td>
+{% for o in objects %}
+{% ifequal o.object_id s.sighting_of_ref %}
+{{o.name}}
+{% endifequal %}
+{% endfor %}
+</td>
+<td>{{s.object_id.object_id}}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div><!--/#sightings-->
+
+<div class="tab-pane active" id="rel_table" >
+<table class="table table-condensed table-stripe table-hover display" width="100%">
+<thead><tr>
+<th class="col-sm-4">Object ID</th>
+<th class="col-sm-3">Source</th>
+<th class="col-sm-2">Type</th>
+<th class="col-sm-3">Target</th>
+</tr></thead>
+<tbody id=relations_table>
+{% for r in rels %}
+<tr>
+<td>{{r.object_id}}</a></td>
+<td>
+{% for s in objects %}
+{% if s.object_id == r.source_ref %}
+<span class="label label-primary">{{s.object_type.name}}</span>
+<a href="/stix/{{s.object_id}}">{{s.name}}</a>
+{% endif %}
+{% endfor %}
+</td>
+<td><span class="label label-info">{{r.relationship_type.name}}</span></td>
+<td>
+{% for t in objects %}
+{% if t.object_id == r.target_ref %}
+<span class="label label-primary">{{t.object_type.name}}</span>
+<a href="/stix/{{t.object_id}}">{{t.name}}</a>
+{% endif %}
+{% endfor %}
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div><!--/#relations-->
+
+<div class="tab-pane " id="obj_table" >
+
+<table class="table table-condensed table-stripe table-hover display" width="100%">
+<thead><tr>
+<!--
+<th class="col-sm-2">
+<form>{% csrf_token %}
+<div id="filter">Type:{{soform.type}}</div>
+</form>
+</th>
+-->
+<th class="col-sm-4">Object ID</th>
+<th class="col-sm-4">Name</th>
+<th class="col-sm-2">Type</th>
+<th class="col-sm-2">Label</th>
+</tr></thead>
+<tbody >
+{% for o in objects %}
+<tr>
+<td>{{o.object_id.object_id}}</td>
+<td><a href="/stix/{{o.object_id}}">{{o.name}}</a></td>
+<td>{{o.object_type.name}}</td>
+<td>{% for l in o.labels.all %}{{l}}<br>{% endfor %}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div><!--/#objects-->
+
+</div><!--/tab-content-->
+
+</div><!--/.panel-body-->
+</div><!--/.panel-->
+
+</div><!--/tables-->
+
+{% block stixvizlib %}
+<script type="text/javascript" src="/static/d3/d3.min.js"></script>
+<script type="text/javascript" src="/static/stixviz/stix2viz.js"></script>
+<script type="text/javascript" src="/static/stixviz/app.js"></script>
+{% endblock %}
+
+{% endblock %}
+
+{% endblock %}
