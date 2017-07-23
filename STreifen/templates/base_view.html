@@ -30,6 +30,9 @@ $(document).ready(
                     }else if (parent.is("div#select_add")){
                         aform = $(result).find("#add_object");
                         $("#add_object").replaceWith(aform);
+                    }else if (parent.is("div#select_bulk")){
+                        bform = $(result).find("#bulk_create");
+                        $("#bulk_create").replaceWith(bform);
                     }else if (parent.is("div#filter")){
                         table = $(result).find("tbody#objects_table");
                         console.log(table);
@@ -48,7 +51,7 @@ $(document).ready(
 
 {% block container %}
 
-{% block delete %}
+{% block modal_delete %}
 <div class="modal" id="delete_form" role="dialog">
 <div class="modal-dialog"><div class="modal-content">
 <div class="modal-header">
@@ -67,7 +70,28 @@ $(document).ready(
 </div><!--/.modal-->
 {% endblock %}
 
-{% block modal %}
+{% block modal_bulk %}
+<div class="modal" id="bulk_form" role="dialog">
+<div class="modal-dialog"><div class="modal-content">
+<div class="modal-header">
+<button type="button" class="close" data-dismiss="modal">&times;</button>
+<h4 class="modal-title">Bulk Create</h4>
+</div>
+<div class="modal-body">
+<form method="post">{% csrf_token %}
+<div id="select_bulk">{{soform.as_table}}</div>
+<div id="bulk_create">{{obform}}</div>
+{{bform}}
+<input class="btn btn-primary btn-sm" type="submit" name="create_bulk" value="Create">
+</form>
+</div><!--/.modal-body-->
+</div><!--/.modal-content-->
+</div><!--/.modal-dialog-->
+</div><!--/.modal-->
+{% endblock %}
+
+
+{% block modal_add %}
 <div class="modal" id="add_form" role="dialog">
 <div class="modal-dialog"><div class="modal-content">
 <div class="modal-header">
@@ -85,7 +109,9 @@ $(document).ready(
 </div><!--/.modal-content-->
 </div><!--/.modal-dialog-->
 </div><!--/.modal-->
+{% endblock %}
 
+{% block modal_create %}
 <div class="modal" id="create_form" role="dialog">
 <div class="modal-dialog"><div class="modal-content">
 <div class="modal-header">
@@ -111,12 +137,12 @@ $(document).ready(
 </div><!--/.modal-->
 {% endblock %}
 
-{% block edit %}
+{% block modal_edit %}
 <div class="modal" id="obj_form" role="dialog">
 <div class="modal-dialog"><div class="modal-content">
 <div class="modal-header">
 <button type="button" class="close" data-dismiss="modal">&times;</button>
-<h4 class="modal-title">Edit Report</h4>
+<h4 class="modal-title">Edit</h4>
 </div>
 <div class="modal-body">
 <form method="post">{% csrf_token %}
@@ -137,12 +163,11 @@ $(document).ready(
 <div id="obj_panel" class="panel panel-primary">
 <div class="panel-heading">
 <h4>
-<a class="btn btn-default btn-xs" href="">{{obj.id}}</a>
+<a data-toggle="collapse" href="#obj_body" style="color:white">▼</a>
+<a style="color:white" href="">{{obj.object_id.object_id}}</a>
 <a class="btn btn-warning btn-xs" data-toggle="modal" href="#obj_form">Edit</a>
-<a data-toggle="collapse" href="#obj_body" style="color:white">
-{{obj.name}} ({{obj.object_id}})
-</a>
 <a class="btn btn-danger btn-xs" data-toggle="modal" href="#delete_form">Delete</a>
+<br>
 </h4>
 </div><!--.panel-heading-->
 
@@ -151,18 +176,22 @@ $(document).ready(
 <div class="panel-body">
 
 <table class="table table-condensed">
-<tr><th class="col-md-3">Created / Modified</th><td>{{obj.created}} / {{obj.modified}}</td></tr>
+<tr><th class="col-md-2">Name</th><td>{{obj.name}}</td></tr>
+<tr><th >Created / Modified</th><td>{{obj.created}} / {{obj.modified}}</td></tr>
+{% block property %}
+{% if obj.object_type.name != "campaign"%}
 <tr><th class="col-md-3">Labels</th>
 <td>
 {% for l in obj.labels.all %}
 {{l.value}}<br>
 {% endfor %}
 </td></tr>
-
-{% block property %}
-{% ifequal obj.object_type.name "report"%}
+{% endif %}
+{% if obj.object_type.name == "report"%}
 <tr><th >Published</th><td>{{obj.published}}</td></tr>
-{% endifequal %}
+{% elif obj.object_type.name == "threat-actor" or obj.object_type.name == "campaign" %}
+<tr><th >Alias</th><td>{% for a in obj.aliases.all %}{{a}}<br>{% endfor%}</td></tr>
+{% endif %}
 {% endblock %}
 
 <tr>
@@ -225,20 +254,24 @@ STIX
 {% block bottom_pane %}
 
 <ul class="nav nav-pills">
-<li class="active"><a data-toggle="tab" href="#rel_table">Relations</a></li>
+<li class="active"><a data-toggle="tab" href="#obj_table">Objects</a></li>
+{% if obj.object_type.name == "indicator" %}
+<li><a data-toggle="tab" href="#pattern_table">Patterns</a></li>
+{% endif %}
+<li ><a data-toggle="tab" href="#rel_table">Relations</a></li>
 <li><a data-toggle="tab" href="#sight_table">Sightings</a></li>
-<li ><a data-toggle="tab" href="#obj_table">Objects</a></li>
 </ul>
 <div class="panel panel-primary">
 <div class="panel-heading"></div>
 <div class="panel-body">
+<a class="btn btn-primary btn-xs" data-toggle="modal" href="#add_form">Add</a>
+<a class="btn btn-warning btn-xs" data-toggle="modal" href="#detach_form">Detach</a>
 {% if obj.object_type.name == "identity" %}
 <a class="btn btn-primary btn-xs" data-toggle="modal" href="#sight_form">Sighting</a>
-{% else %}
-<a class="btn btn-primary btn-xs" data-toggle="modal" href="#add_form">Add</a>
-{% endif %}
+{% elif obj.object_type.name == "report" %}
 <a class="btn btn-info btn-xs" data-toggle="modal" href="#create_form">Create</a>
-<a class="btn btn-warning btn-xs" data-toggle="modal" href="#detach_form">Detach</a>
+<a class="btn btn-info btn-xs" data-toggle="modal" href="#bulk_form">Bulk Create</a>
+{% endif %}
 
 
 <div class="tab-content">
@@ -282,7 +315,7 @@ STIX
 </table>
 </div><!--/#sightings-->
 
-<div class="tab-pane active" id="rel_table" >
+<div class="tab-pane" id="rel_table" >
 <table class="table table-condensed table-stripe table-hover display" width="100%">
 <thead><tr>
 <th class="col-sm-4">Object ID</th>
@@ -317,7 +350,7 @@ STIX
 </table>
 </div><!--/#relations-->
 
-<div class="tab-pane " id="obj_table" >
+<div class="tab-pane active" id="obj_table" >
 
 <table class="table table-condensed table-stripe table-hover display" width="100%">
 <thead><tr>
@@ -328,18 +361,18 @@ STIX
 </form>
 </th>
 -->
-<th class="col-sm-4">Object ID</th>
 <th class="col-sm-4">Name</th>
 <th class="col-sm-2">Type</th>
 <th class="col-sm-2">Label</th>
+<th class="col-sm-4">Object ID</th>
 </tr></thead>
 <tbody >
 {% for o in objects %}
 <tr>
-<td>{{o.object_id.object_id}}</td>
 <td><a href="/stix/{{o.object_id}}">{{o.name}}</a></td>
 <td>{{o.object_type.name}}</td>
 <td>{% for l in o.labels.all %}{{l}}<br>{% endfor %}</td>
+<td>{{o.object_id.object_id}}</td>
 </tr>
 {% endfor %}
 </tbody>

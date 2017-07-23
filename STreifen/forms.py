@@ -43,6 +43,21 @@ class RelationshipForm(forms.ModelForm):
             "description",
         ]
 
+class CampaignForm(forms.ModelForm):
+    new_alias = forms.CharField()
+    class Meta:
+        model = Campaign
+        fields = [
+            "name",
+            "aliases",
+            "first_seen",
+            "last_seen",
+            "description",
+        ]
+    def __init__(self, *args, **kwargs):
+        super(CampaignForm, self).__init__(*args, **kwargs)
+        self.fields["new_alias"].required = False
+
 class SightingForm(forms.ModelForm):
     class Meta:
         model = Sighting
@@ -85,8 +100,8 @@ class MalwareForm(forms.ModelForm):
         model = Malware
         fields = [
             "name",
-            "description",
             "labels",
+            "description",
         ]
 
 class AttackPatternForm(forms.ModelForm):
@@ -130,6 +145,7 @@ class SelectObjectForm(forms.Form):
                 "threat-actor",
                 "relationship",
                 "sighting",
+                "indicator",
             ]
         ),
     )
@@ -290,15 +306,37 @@ class IndicatorForm(forms.ModelForm):
             "name",
             "labels",
             "description",
-            #"valid_from",
-            #"valid_until",
-            #"pattern",
+            "valid_from",
+            "valid_until",
+            "pattern",
         ]
 
 class PatternForm(forms.ModelForm):
     class Meta:
         model = IndicatorPattern
         fields = [
-            "property",
+            "observable",
+            "pattern",
+        ]
+
+class ObservablePropertyForm(forms.ModelForm):
+    class Meta:
+        model = ObservableProperty
+        fields = [
+            "key",
             "value",
         ]
+
+class SelectObservableForm(forms.Form):
+    label = forms.ModelChoiceField(
+        queryset=IndicatorLabel.objects.all()
+    )
+    #property = forms.ModelChoiceField(
+    #    queryset=ObservableObjectProperty.objects.all()
+    #)
+    indicates = forms.ModelChoiceField(
+        queryset=Malware.objects.all()
+    )
+    def __init__(self, *args, **kwargs):
+        super(SelectObservableForm, self).__init__(*args, **kwargs)
+        self.fields["indicates"].required = False

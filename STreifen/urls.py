@@ -6,7 +6,7 @@ from .views.drs import viz_drs, data_drs
 from .views.stix import stix_view
 from .views.taxii import taxii_discovery, taxii_collection, taxii_get_objects
 from .views.timeline import viz_timeline, data_timeline
-from .tables import ReportData, ThreatActorData, IdentityData, MalwareData, IndicatorData
+from .tables import *
 
 urlpatterns = [
     url(r'^$', stix_view),
@@ -15,6 +15,9 @@ urlpatterns = [
     url(r'^data/threat-actor/', ThreatActorData.as_view(), name="threatactor_data"),
     url(r'^data/identity/', IdentityData.as_view(), name="identity_data"),
     url(r'^data/indicator/', IndicatorData.as_view(), name="inicator_data"),
+    url(r'^data/observable/', ObservablePropertyData.as_view()),
+    url(r'^data/pattern/', IndicatorPatternData.as_view(), name="pattern_data"),
+    url(r'^data/campaign/', CampaignData.as_view(), name="campaign_data"),
     url(r'^data/drs/$', data_drs),
     url(r'^data/timeline/$', data_timeline),
     url(r'^data/malware/', MalwareData.as_view(), name="malware_data"),

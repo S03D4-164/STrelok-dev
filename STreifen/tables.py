@@ -1,10 +1,11 @@
 from django_datatables_view.base_datatable_view import BaseDatatableView
 from .models import *
+from .forms import *
 
 class ReportData(BaseDatatableView):
     model = Report
-    columns = ['created', 'name', 'published']
-    order_columns = ['created', 'name', 'published']
+    columns = ['created', 'name', 'created_by_ref', 'published']
+    order_columns = ['created', 'name', 'created_by_ref', 'published']
     max_display_length = 100
 
     def get_initial_queryset(self):
@@ -21,6 +22,11 @@ class ReportData(BaseDatatableView):
                 return None
         elif column == 'name':
             return '<a href="/stix/{0}">{1}</a>'.format(row.object_id,row.name)
+        elif column == 'object_refs':
+            return row.object_refs.count()
+        elif column == 'created_by_ref':
+            c = get_obj_from_id(row.created_by_ref)
+            return c.name
         else:
             return super(ReportData, self).render_column(row, column)
     def filter_queryset(self, qs):
@@ -29,6 +35,26 @@ class ReportData(BaseDatatableView):
             qs = qs.filter(published__value__iregex=search) \
                 | qs.filter(name__iregex=search)
         return qs.distinct()
+
+class CampaignData(BaseDatatableView):
+    model = Campaign
+    columns = ['created', 'name', 'aliases', 'first_seen']
+    order_columns = ['created', 'name', 'aliases','first_seen']
+    max_display_length = 100
+    def render_column(self, row, column):
+        if column == 'id':
+            return '<a class="btn btn-default btn-xs">{0}</button>'.format(row.id)
+        elif column == 'name':
+            return '<a href="/stix/{0}">{1}</a>'.format(row.object_id,row.name)
+        elif column == 'aliases':
+            a = []
+            for alias in row.aliases.all():
+                if not alias.name in a:
+                    a.append(alias.name)
+            return " / ".join(a)
+        else:
+            return super(CampaignData, self).render_column(row, column)
+
 
 class ThreatActorData(BaseDatatableView):
     model = ThreatActor
@@ -80,6 +106,30 @@ class MalwareData(BaseDatatableView):
                 | qs.filter(name__iregex=search)
         return qs.distinct()
 
+class ObservablePropertyData(BaseDatatableView):
+    model = ObservableProperty
+    columns = ['key', 'value']
+    order_columns = ['key', 'value']
+    max_display_length = 100
+    def render_column(self, row, column):
+        if column == 'key':
+            p = row.key.type.name + ":" + row.key.name
+            return p
+        else:
+            return super(ObservablePropertyData, self).render_column(row, column)
+
+class IndicatorPatternData(BaseDatatableView):
+    model = IndicatorPattern
+    columns = ['pattern']
+    order_columns = ['pattern']
+    max_display_length = 100
+    def render_column(self, row, column):
+        if column == 'property':
+            p = row.property.type.name + ":" + row.property.name
+            return p
+        else:
+            return super(IndicatorPatternData, self).render_column(row, column)
+
 class IndicatorData(BaseDatatableView):
     model = Indicator
     columns = ['created', 'name', 'pattern']
@@ -89,7 +139,12 @@ class IndicatorData(BaseDatatableView):
         if column == 'pattern':
             pattern = ""
             for p in row.pattern.all():
-                pattern += p.value + "<br>"
+                """
+                pattern += p.property.type.name
+                pattern += ":" + p.property.name
+                """
+                pattern += p.property.alias
+                pattern += "=" + p.value + "<br>"
             return pattern
         elif column == 'name':
             return '<a href="/stix/{0}">{1}</a>'.format(row.object_id,row.name)

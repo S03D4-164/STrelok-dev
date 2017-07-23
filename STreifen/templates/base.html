@@ -26,7 +26,6 @@
 {% endblock %}
 
 {% block vislib %}
-<link rel="stylesheet" type="text/css" href="/static/font-awesome/css/font-awesome.min.css">
 <link href="/static/vis/vis.min.css" type="text/css" rel="stylesheet"></link>
 <script type="text/javascript" src="/static/vis/vis.min.js"></script>
 <script type="text/javascript" src="/static/js/visnetwork.js"></script>
@@ -50,13 +49,16 @@
 <a href="/">Top</a>
 </li>
 
+<li><a href="/stix/identity/">Identity</a></li>
+
 <li><a href="/stix/report/">Report</a></li>
 
 <li><a href="/stix/threat-actor/">Threat Actor</a></li>
 
-<li><a href="/stix/identity/">Identity</a></li>
 
 <li><a href="/stix/malware/">Malware</a></li>
+
+<li><a href="/stix/campaign/">Campaign</a></li>
 
 <li><a href="/stix/indicator/">Indicator</a></li>
 
@@ -70,6 +72,8 @@
 </nav>
 {% endblock %}
 
+{% block container %}{% endblock %}
+
 {% block message %}
 {% if messages %}
 <div class="col-md-12">
@@ -81,8 +85,6 @@
 </div>
 {% endif %}
 {% endblock %}
-
-{% block container %}{% endblock %}
 
 </div><!--/.container-fluid-->
 

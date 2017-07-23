@@ -28,6 +28,12 @@ $(document).ready(
             "ajax": "/data/{{type}}",
             "order":[0, 'desc'],
         });
+	$('#pattern_table').dataTable({
+            "processing":true,
+            "serverSide":true,
+            "ajax": "/data/observable",
+            "order":[0, 'desc'],
+        });
         $('#id_published').datetimepicker({
             format:'Y-m-d H:i'
         })
@@ -60,12 +66,17 @@ $(document).ready(
 <div class="modal-dialog"><div class="modal-content">
 <div class="modal-header">
 <button type="button" class="close" data-dismiss="modal">&times;</button>
-<h4 class="modal-title">Create {{type|capfirst}}</h4></div>
+<h4 class="modal-title">Bulk Create {{type|capfirst}}</h4></div>
 <div class="modal-body">
-<h4>Format: {{bulkformat}}</h4>
+<h4>Input Format: {{bulkformat}}</h4>
 <form method=post>{% csrf_token %}
-{{bulkform}}
-<input class="btn btn-primary btn-sm" type="submit" name="create_bulk" value="create">
+<table class="table">
+{% if type == "indicator" %}
+{{soform.as_table}}
+{% endif %}
+{{bulkform.as_table}}
+</table>
+<input class="btn btn-primary btn-sm" type="submit" name="create_bulk" value="Create">
 </form></div><!--/.modal-body-->
 </div><!--/.modal-content-->
 </div><!--/.modal-dialog-->
@@ -79,7 +90,11 @@ $(document).ready(
 {% block top_pane %}{% endblock %}
 
 {% block left_pane %}
+{% if type == "threat-actor" or type == "indicator" %}
 <div id="left_pane" class="col-md-6">
+{% else %}
+<div id="left_pane" class="col-md-12">
+{% endif %}
 <h3 style="margin-top: 0">{{type|capfirst}}
 <a class="btn btn-primary btn-sm" data-toggle="modal" href="#create_form">Create</a>
 <a class="btn btn-primary btn-sm" data-toggle="modal" href="#bulk_form">Bulk Create</a>
@@ -88,8 +103,24 @@ $(document).ready(
 <table id="objtype_table" class="table table-condensed table-stripe table-hover display" width="100%">
 <thead><tr>
 {% block left_thead %}
-<th class="col-md-3">Created</th>
-<th class="col-md-3">Name</th>
+<th >Created</th>
+<th >Name</th>
+{% if type == "report" %}
+<th class="col-md-2">Created By</th>
+<th class="col-md-2">Published</th>
+{% elif type == "identity" %}
+<th class="col-md-3">Sector</th>
+<th class="col-md-3">Labels</th>
+{% elif type == "malware" %}
+<th class="col-md-3">Labels</th>
+{% elif type == "campaign" %}
+<th >Aliases</th>
+<th class="col-md-2">First Seen</th>
+{% elif type == "threat-actor" %}
+<th >Aliases</th>
+{% elif type == "indicator" %}
+<th >Pattern</th>
+{% endif %}
 {% endblock %}
 </tr></thead>
 </table>
@@ -97,7 +128,22 @@ $(document).ready(
 {% endblock %}
 
 {% block right_pane %}
-<div id="right_pane" class="col-md-6" >
+{% if type == "indicator" %}
+<div id="left_pane" class="col-md-6">
+<h3 style="margin-top: 0">{{type|capfirst}}
+<a class="btn btn-primary btn-sm" data-toggle="modal" href="#create_form">Create</a>
+<a class="btn btn-primary btn-sm" data-toggle="modal" href="#bulk_form">Bulk Create</a>
+</h3>
+<hr>
+<table id="pattern_table" class="table table-condensed table-stripe table-hover display" width="100%">
+<thead><tr>
+<th >Created</th>
+<th >Name</th>
+</tr></thead>
+</table>
+</div><!--/#left_pane-->
+{% elif type == "threat-actor" %}
+<div id="left_pane" class="col-md-6">
 <div class="panel panel-primary">
 
 <div class="panel-heading">
@@ -110,6 +156,7 @@ Stats
 </div><!--/.panel-body-->
 </div><!--/.panel-->
 </div><!--/.col-md-6-->
+{% endif %}
 {% endblock %}
 
 
