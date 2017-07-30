@@ -4,19 +4,15 @@
 <title>{{type|capfirst}}</title>
 {% endblock %}
 
-{% block vislib %}{% endblock %}
+{% block visjslib %}{% endblock %}
 {% block jquery %}
+{% if type == "threat-actor" %}
+<script type="text/javascript" src="/static/highcharts/highcharts.js"></script>
+<script type="text/javascript" src="/static/highcharts/modules/data.js"></script>
+<script type="text/javascript" src="/static/highcharts/modules/drilldown.js"></script>
+<script src="/static/js/chart_ati.js"></script>
+{% endif %}
 <script>
-function ChangeRight(id){
-    $.ajax({
-        "url":"/viz/{{objtype}}/" + id,
-        "type":"GET",
-        "success":function(result){
-            data = $(result).find("#viz");
-            $("#viz").html(data);
-        }
-    });
-};
 $(document).ready(
     function(){
         $('a[data-toggle="tab"]').on( 'shown.bs.tab', function (e) {
@@ -36,7 +32,10 @@ $(document).ready(
         });
         $('#id_published').datetimepicker({
             format:'Y-m-d H:i'
-        })
+        });
+        {% if type == "threat-actor" %}
+        actorChart({{data|safe}});
+        {% endif %}
     }
 );
 </script>
@@ -50,7 +49,7 @@ $(document).ready(
 <div class="modal-header">
 <button type="button" class="close" data-dismiss="modal">&times;</button>
 <h4 class="modal-title">Create {{type|capfirst}}</h4></div>
-<div class="modal-body"><form method=post>{% csrf_token %}
+<div class="modal-body"><form class="create_form" method=post>{% csrf_token %}
 <table class="table">
 {{form.as_table}}
 </table>
@@ -69,11 +68,9 @@ $(document).ready(
 <h4 class="modal-title">Bulk Create {{type|capfirst}}</h4></div>
 <div class="modal-body">
 <h4>Input Format: {{bulkformat}}</h4>
-<form method=post>{% csrf_token %}
+<form class="create_form" method=post>{% csrf_token %}
 <table class="table">
-{% if type == "indicator" %}
-{{soform.as_table}}
-{% endif %}
+{{sform.as_table}}
 {{bulkform.as_table}}
 </table>
 <input class="btn btn-primary btn-sm" type="submit" name="create_bulk" value="Create">
@@ -97,7 +94,8 @@ $(document).ready(
 {% endif %}
 <h3 style="margin-top: 0">{{type|capfirst}}
 <a class="btn btn-primary btn-sm" data-toggle="modal" href="#create_form">Create</a>
-<a class="btn btn-primary btn-sm" data-toggle="modal" href="#bulk_form">Bulk Create</a>
+<a class="btn btn-warning btn-sm" data-toggle="modal" href="#bulk_form">Bulk Create</a>
+<a class="btn btn-default btn-sm"  href="/stix/{{type}}.json">STIX2</a>
 </h3>
 <hr>
 <table id="objtype_table" class="table table-condensed table-stripe table-hover display" width="100%">
@@ -113,11 +111,12 @@ $(document).ready(
 <th class="col-md-3">Labels</th>
 {% elif type == "malware" %}
 <th class="col-md-3">Labels</th>
+<!--<th class="col-md-3">Description</th>-->
 {% elif type == "campaign" %}
 <th >Aliases</th>
 <th class="col-md-2">First Seen</th>
 {% elif type == "threat-actor" %}
-<th >Aliases</th>
+<th class="col-md-4">Aliases</th>
 {% elif type == "indicator" %}
 <th >Pattern</th>
 {% endif %}
@@ -144,14 +143,13 @@ $(document).ready(
 </div><!--/#left_pane-->
 {% elif type == "threat-actor" %}
 <div id="left_pane" class="col-md-6">
-<div class="panel panel-primary">
+<div class="panel panel-default">
 
 <div class="panel-heading">
 Stats
 </div>
 <div class="panel-body">
-<div id="viz">
-<div class="col-md-12" id="chartContainer" style="position:relative;"></div>
+<div id="container">
 </div>
 </div><!--/.panel-body-->
 </div><!--/.panel-->

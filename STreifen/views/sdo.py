@@ -6,17 +6,13 @@ import STreifen.models as mymodels
 import STreifen.forms as myforms
 from ..models import *
 from ..forms import *
+from .stix import stix_bundle
+from .chart import *
+
 import json
 import stix2
 
-def stix2_json(request, id):
-    obj = STIXObject.objects.get(object_id__object_id=id)
-    objs = _get_related_obj(obj)
-    bundle = stix_bundle(objs)
-    j = json.dumps(json.loads(str(bundle)), indent=2)
-    return HttpResponse(j,  content_type="application/json")
-
-def _get_related_obj(sdo):
+def get_related_obj(sdo):
     objects = []
     ids = [sdo.object_id.id]
     rels = None
@@ -37,157 +33,24 @@ def _get_related_obj(sdo):
             |Q(sighting_of_ref=sdo.object_id)\
         )
     if rels:
+        #print(rels)
         ids += rels.values_list("object_id", flat=True)
         ids += rels.values_list("source_ref", flat=True)
         ids += rels.values_list("target_ref", flat=True)
     if sights:
+        #print(sights)
         ids += sights.values_list("object_id", flat=True)
         ids += sights.values_list("sighting_of_ref", flat=True)
     oids = STIXObjectID.objects.filter(
         id__in=ids
     )
+    #print(oids)
     for oid in oids:
         obj = myforms.get_obj_from_id(oid)
         if obj:
             objects.append(obj)
+    #print(objects)
     return objects
-
-def stix_bundle(objs):
-    objects = ()
-    """
-    objs = _get_related_obj(sdo)
-    ids = [sdo.object_id.id]
-    rels = None
-    sights = None
-    if sdo.object_type.name == "report":
-        sdo = Report.objects.get(id=sdo.id)
-        ids += sdo.object_refs.all().values_list("id",flat=True)
-        rels = Relationship.objects.filter(id__in=sdo.object_refs.all())
-        sights = Sighting.objects.filter(id__in=sdo.object_refs.all())
-        
-    else:
-        rels = Relationship.objects.filter(
-            Q(source_ref=sdo.object_id)\
-            |Q(target_ref=sdo.object_id)\
-        )
-        sights = Sighting.objects.filter(
-            Q(where_sighted_refs=sdo.object_id)\
-            |Q(sighting_of_ref=sdo.object_id)\
-        )
-    if rels:
-        ids += rels.values_list("object_id", flat=True)
-        ids += rels.values_list("source_ref", flat=True)
-        ids += rels.values_list("target_ref", flat=True)
-    if sights:
-        ids += sights.values_list("object_id", flat=True)
-        ids += sights.values_list("sighting_of_ref", flat=True)
-    oids = STIXObjectID.objects.filter(
-        id__in=ids
-    )
-    for oid in oids:
-        obj = myforms.get_obj_from_id(oid)
-    """
-    for obj in objs:
-        if obj.object_type.name == 'identity':
-            i = stix2.Identity(
-                id=obj.object_id.object_id,
-                name=obj.name,
-                identity_class=obj.identity_class,
-                description=obj.description,
-                #sectors=[str(s.value) for s in obj.sectors.all()],
-                sectors=[str(l.value) for l in obj.labels.all()],
-                created=obj.created,
-                modified=obj.modified,
-            )
-            objects += (i,)
-        elif obj.object_type.name == 'attack-pattern':
-            a = stix2.AttackPattern(
-                id=obj.object_id.object_id,
-                name=obj.name,
-                description=obj.description,
-                created=obj.created,
-                modified=obj.modified,
-            )
-            objects += (a,)
-        elif obj.object_type.name == 'malware':
-            m = stix2.Malware(
-                id=obj.object_id.object_id,
-                name=obj.name,
-                description=obj.description,
-                labels=[str(l.value) for l in obj.labels.all()],
-                created=obj.created,
-                modified=obj.modified,
-            )
-            objects += (m,)
-        elif obj.object_type.name == 'indicator':
-            i = stix2.Indicator(
-                id=obj.object_id.object_id,
-                name=obj.name,
-                description=obj.description,
-                labels=[str(l.value) for l in obj.labels.all()],
-                pattern=[str(p.value) for p in obj.pattern.all()],
-                created=obj.created,
-                modified=obj.modified,
-            )
-            objects += (i,)
-        elif obj.object_type.name == 'threat-actor':
-            t = stix2.ThreatActor(
-                id=obj.object_id.object_id,
-                name=obj.name,
-                description=obj.description,
-                labels=[str(l.value) for l in obj.labels.all()],
-                aliases=[str(a.name) for a in obj.aliases.all()],
-                created=obj.created,
-                modified=obj.modified,
-            )
-            objects += (t,)
-        elif obj.object_type.name == 'campaign':
-            c = stix2.Campaign(
-                id=obj.object_id.object_id,
-                name=obj.name,
-                description=obj.description,
-                #labels=[str(l.value) for l in obj.labels.all()],
-                aliases=[str(a.name) for a in obj.aliases.all()],
-                created=obj.created,
-                modified=obj.modified,
-            )
-            objects += (c,)
-        elif obj.object_type.name == 'relationship':
-            r = stix2.Relationship(
-                id=obj.object_id.object_id,
-                relationship_type=obj.relationship_type.name,
-                description=obj.description,
-                source_ref=obj.source_ref.object_id,
-                target_ref=obj.target_ref.object_id,
-                created=obj.created,
-                modified=obj.modified,
-            )
-            objects += (r,)
-        elif obj.object_type.name == 'sighting':
-            s = stix2.Sighting(
-                id=obj.object_id.object_id,
-                sighting_of_ref=obj.sighting_of_ref.object_id,
-                where_sighted_refs=[str(w.object_id) for w in obj.where_sighted_refs.all()],
-                first_seen=obj.first_seen,
-                last_seen=obj.last_seen,
-                created=obj.created,
-                modified=obj.modified,
-            )
-            objects += (s,)
-        elif obj.object_type.name == 'report':
-            r = stix2.Report(
-                id=obj.object_id.object_id,
-                labels=[str(l.value) for l in obj.labels.all()],
-                name=obj.name,
-                description=obj.description,
-                published=obj.published,
-                object_refs=[str(r.object_id) for r in obj.object_refs.all()],
-                created=obj.created,
-                modified=obj.modified,
-            )
-            objects += (r,)
-    bundle = stix2.Bundle(*objects)
-    return bundle
 
 def bulk_create_indicator(label, property, input,   src=None):
     for line in input.split("\n"):
@@ -250,24 +113,69 @@ def sdo_list(request, type):
             if bulkform.is_valid():
                 input = bulkform.cleaned_data["input"]
             if input:
-                if type == "indicator":
-                    soform = SelectObservableForm(request.POST)
-                    if soform.is_valid():
-                        property = soform.cleaned_data["property"]
-                        label = soform.cleaned_data["label"]
-                        bulk_create_indicator(label,property,input)
-                elif type == "malware":        
+                if type == "threat-actor":
+                    label = None
+                    sform = ThreatActorLabelForm(request.POST)
+                    if sform.is_valid():
+                        label = sform.cleaned_data["labels"]
                     for line in input.split("\n"):
                         if line:
                             array = line.strip().split(",")
-                            if len(array) >= 2:
+                            if len(array) >= 1:
+                                t, cre = ThreatActor.objects.get_or_create(name=array[0])
+                                ta, cre = ThreatActorAlias.objects.get_or_create(name=array[0])
+                                t.aliases.add(ta)
+                                for l in label:
+                                    t.labels.add(l)
+                                if len(array) >= 2:
+                                    for a in array[1:]:
+                                        ta, cre = ThreatActorAlias.objects.get_or_create(name=a)
+                                        t.aliases.add(ta)
+                                t.save()
+                elif type == "indicator":
+                    sform = SelectObservableForm(request.POST)
+                    if sform.is_valid():
+                        property = sform.cleaned_data["property"]
+                        label = sform.cleaned_data["label"]
+                        bulk_create_indicator(label,property,input)
+                elif type == "identity":
+                    ic = None
+                    sform = IdentityClassForm(request.POST)
+                    if sform.is_valid():
+                        ic = sform.cleaned_data["identity_class"]
+                    for line in input.split("\n"):
+                        if line:
+                            array = line.strip().split(",")
+                            if len(array) >= 1:
+                                i, cre = Identity.objects.get_or_create(
+                                    name = array[0],
+                                    identity_class = ic,
+                                )
+                                if len(array) >= 2:
+                                    il, cre = IdentityLabel.objects.get_or_create(
+                                        value = array[1],
+                                    )
+                                    i.labels.add(il)
+                                if len(array) >= 3:
+                                    i.description = array[2]
+                                i.save()
+                elif type == "malware":
+                    label = None
+                    sform = MalwareLabelForm(request.POST)
+                    if sform.is_valid():
+                        label = sform.cleaned_data["labels"]
+                    for line in input.split("\n"):
+                        if line:
+                            array = line.strip().split(",")
+                            if len(array) >= 1:
                                 m, created = Malware.objects.get_or_create(
                                     name=array[0],
                                 )
-                                l = MalwareLabel.objects.filter(value=array[1])
-                                if l.count() == 1:
-                                    m.labels.add(l[0])
-                                    m.save()
+                                for l in label:
+                                    m.labels.add(l)
+                                if len(array) >= 2:
+                                    m.description = array[1]
+                                m.save()
     c = {
         "type": type,
         "form": form,
@@ -276,11 +184,17 @@ def sdo_list(request, type):
     if type == "report":
         c["bulkformat"] = "name,label,published,(description)"
     elif type == "threat-actor":
-        c["bulkformat"] = "name,label,([alias,..])"
-    elif type in ("identity", "malware"):
-        c["bulkformat"] = "name,(label)"
+        c["bulkformat"] = "name,([alias,..])"
+        c["sform"] = ThreatActorLabelForm()
+        c["data"] = stats_ati()
+    elif type == "malware":
+        c["bulkformat"] = "name,(description)"
+        c["sform"] = MalwareLabelForm()
+    elif type == "identity":
+        c["bulkformat"] = "name,(label,description)"
+        c["sform"] = IdentityClassForm()
     elif type == "indicator":
-        c["soform"] = SelectObservableForm()
+        c["sform"] = SelectObservableForm()
     return render(request, 'base_list.html', c)
 
 def getform(type, request=None, instance=None, report=False):
@@ -348,19 +262,19 @@ def add_object_refs(report, oid):
             report.object_refs.add(wsr)
     return report
 
-def get_model_from_id(id):
-    type = ""
-    for i in id.split("-")[0:2]:
-        type += i.capitalize()
-    m = getattr(mymodels, type)
+def get_model_from_type(type):
+    name = ""
+    for i in type.split("-")[0:2]:
+        name += i.capitalize()
+    m = getattr(mymodels, name)
     return m
 
 def sdo_view(request, id):
-    m = get_model_from_id(id)
+    m = get_model_from_type(id)
     sdo = m.objects.get(object_id__object_id=id)
     form = getform(id.split("--")[0], instance=sdo)
 
-    objs = _get_related_obj(sdo)
+    objs = get_related_obj(sdo)
     stix = stix_bundle(objs)
     rels = []
     sights = []
@@ -398,9 +312,12 @@ def sdo_view(request, id):
     tgt = STIXObject.objects.filter(object_type__in=drs.values("target"))
     if not sdo.object_type.name == "report":
       aoform.fields["objects"].choices = object_choices(
-        ids=STIXObjectID.objects.filter(id__in=tgt)
+        #ids=STIXObjectID.objects.filter(id__in=tgt)
+        ids=[]
       )
       aoform.fields["relation"].required = True
+    if sdo.object_type.name == "identity":
+        aoform = SightingForm()
 
     if request.method == "POST":
         print(request.POST)
@@ -411,24 +328,43 @@ def sdo_view(request, id):
                 if s.object_type.name == "threat-actor":
                     n = form.cleaned_data["new_alias"]
                     if n:
-                        ta, created = ThreatActorAlias.objects.get_or_create(
+                        ta, cre = ThreatActorAlias.objects.get_or_create(
                             name = n
                         )
                         s.aliases.add(ta)
-                        s.save
+                        s.save()
+                elif s.object_type.name == "identity":
+                    l = form.cleaned_data["new_label"]
+                    if l:
+                        il, cre = IdentityLabel.objects.get_or_create(
+                            value = l
+                        )
+                        s.labels.add(il)
+                        s.save()
                 elif s.object_type.name == "campaign":
                     n = form.cleaned_data["new_alias"]
                     if n:
-                        ta, created = CampaignAlias.objects.get_or_create(
+                        ta, cre = CampaignAlias.objects.get_or_create(
                             name = n
                         )
                         s.aliases.add(ta)
-                        s.save
+                        s.save()
                 messages.add_message(
                     request, messages.SUCCESS, 'Updated.'
                 )
                 return redirect("/stix/"+id)
-        elif 'detach' in request.POST:
+        elif 'detach[]' in request.POST:
+            dlist = request.POST.getlist("detach[]")
+            for i in STIXObjectID.objects.filter(
+                object_id__in=dlist
+            ):
+                d = get_obj_from_id(i)
+                d.delete()
+            messages.add_message(
+                request, messages.SUCCESS, 'Removed.'
+            )
+            #return redirect("/stix/"+id)
+        elif 'detach_ref' in request.POST:
             rform = ReportRefForm(request.POST, instance=report)
             #print(rform)
             if rform.is_valid():
@@ -474,6 +410,23 @@ def sdo_view(request, id):
                         object_id__startswith=selected.split("--")[0]
                     )
                 )
+        elif 'select_rel' in request.POST:
+            rt = request.POST.get('select_rel')
+            #print(sotid)
+            if rt:
+                #r = RelationshipType.objects.get(id=rid)
+                drs = DefinedRelationship.objects.filter(
+                    source=sdo.object_type,
+                    type__id=rt,
+                )
+                so = STIXObject.objects.filter(
+                    object_type__in=drs.values_list("target",flat=True),
+                )
+                aoform.fields["objects"].choices = object_choices(
+                    ids=STIXObjectID.objects.filter(
+                        id__in=so.values_list("object_id__id",flat=True)
+                    )
+                )
         elif 'create_obj' in request.POST:
             sotid = request.POST.get('type')
             sot = STIXObjectType.objects.get(id=sotid)
@@ -485,8 +438,28 @@ def sdo_view(request, id):
                 #report.object_refs.add(saved.object_id)
                 report = add_object_refs(report, saved.object_id)
                 report.save()
-                redirect("/stix/"+id)
+                return redirect("/stix/"+id)
 
+        elif 'add_sight' in request.POST:
+            aoform = SightingForm(request.POST)
+            if aoform.is_valid():
+                refs = aoform.cleaned_data["sighting_of"]
+                first_seen = aoform.cleaned_data["first_seen"]
+                last_seen = aoform.cleaned_data["last_seen"]
+                description = aoform.cleaned_data["description"]
+                for ref in refs:
+                    s = Sighting.objects.create(
+                        sighting_of_ref=ref,
+                        first_seen=first_seen,
+                        last_seen=last_seen,
+                        description=description,
+                    )
+                    s.where_sighted_refs.add(sdo.object_id)
+                    s.save()
+                messages.add_message(
+                    request, messages.SUCCESS, 'Updated.'
+                )
+                return redirect("/stix/"+id)
         elif 'add_obj' in request.POST:
             aoform = AddObjectForm(request.POST)
             if aoform.is_valid():
@@ -505,7 +478,7 @@ def sdo_view(request, id):
                 messages.add_message(
                     request, messages.SUCCESS, 'Updated.'
                 )
-                redirect("/stix/"+id)
+                return redirect("/stix/"+id)
 
     c = {
         "obj": sdo,

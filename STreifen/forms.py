@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.DEBUG)
 class InputForm(forms.Form):
     input = forms.CharField(
         widget=forms.Textarea(
-            attrs={'style':'height:400px;'}
+            attrs={'style':'height:300px;'}
         )
     )
 
@@ -59,23 +59,46 @@ class CampaignForm(forms.ModelForm):
         self.fields["new_alias"].required = False
 
 class SightingForm(forms.ModelForm):
+    sighting_of = forms.ModelMultipleChoiceField(
+        queryset = STIXObjectID.objects.all()
+    )
     class Meta:
         model = Sighting
         fields = [
-            "where_sighted_refs",
-            "sighting_of_ref",
+            #"where_sighted_refs",
+            "sighting_of",
             "first_seen",
             "last_seen",
             "description",
         ]
     def __init__(self, *args, **kwargs):
         super(SightingForm, self).__init__(*args, **kwargs)
+        self.fields["sighting_of"].choices = object_choices(
+            ids = STIXObjectID.objects.filter(
+                Q(object_id__startswith="threat-actor--")\
+                |Q(object_id__startswith="malware--")\
+                |Q(object_id__startswith="attack-pattern--")\
+                |Q(object_id__startswith="campaign--")\
+                |Q(object_id__startswith="intrusion-set--")\
+                |Q(object_id__startswith="tool--")\
+            )
+        )
+        """
         self.fields["where_sighted_refs"].choices = object_choices(
             ids=STIXObjectID.objects.filter(
                 object_id__startswith="identity--",
             ),
             dummy=True
         )
+        """
+
+class ThreatActorLabelForm(forms.ModelForm):
+    #new_label = forms.CharField()
+    class Meta:
+        model = ThreatActor
+        fields = [
+            "labels",
+        ]
 
 class ThreatActorForm(forms.ModelForm):
     new_alias = forms.CharField()
@@ -95,6 +118,13 @@ class ThreatActorForm(forms.ModelForm):
         super(ThreatActorForm, self).__init__(*args, **kwargs)
         self.fields["new_alias"].required = False
 
+class MalwareLabelForm(forms.ModelForm):
+    class Meta:
+        model = Malware
+        fields = [
+            "labels",
+        ]
+
 class MalwareForm(forms.ModelForm):
     class Meta:
         model = Malware
@@ -110,6 +140,14 @@ class AttackPatternForm(forms.ModelForm):
         fields = [
             "name",
             "description",
+        ]
+
+class IdentityClassForm(forms.ModelForm):
+    #new_label = forms.CharField()
+    class Meta:
+        model = Identity
+        fields = [
+            "identity_class",
         ]
 
 class IdentityForm(forms.ModelForm):
@@ -154,32 +192,47 @@ class SelectObjectForm(forms.Form):
         self.fields["type"].required = False
 
 
-def get_related_obj(obj):
-    rels = Relationship.objects.filter(
-        Q(source_ref__object_id=obj.object_id)\
-        |Q(target_ref__object_id=obj.object_id)\
+def get_related_obj(sdo):
+    objects = []
+    ids = [sdo.object_id.id]
+    rels = None
+    sights = None
+    if sdo.object_type.name == "report":
+        sdo = Report.objects.get(id=sdo.id)
+        ids += sdo.object_refs.all().values_list("id",flat=True)
+        rels = Relationship.objects.filter(id__in=sdo.object_refs.all())
+        sights = Sighting.objects.filter(id__in=sdo.object_refs.all())
+
+    else:
+        rels = Relationship.objects.filter(
+            Q(source_ref=sdo.object_id)\
+            |Q(target_ref=sdo.object_id)\
+        )
+        sights = Sighting.objects.filter(
+            Q(where_sighted_refs=sdo.object_id)\
+            |Q(sighting_of_ref=sdo.object_id)\
+        )
+    if rels:
+        print(rels)
+        ids += rels.values_list("object_id", flat=True)
+        ids += rels.values_list("source_ref", flat=True)
+        ids += rels.values_list("target_ref", flat=True)
+    if sights:
+        print(sights)
+        ids += sights.values_list("object_id", flat=True)
+        ids += sights.values_list("sighting_of_ref", flat=True)
+    oids = STIXObjectID.objects.filter(
+        id__in=ids
     )
-    #print(rels)
-    sights = Sighting.objects.filter(
-        Q(where_sighted_refs__object_id=obj.object_id)\
-        |Q(sighting_of_ref__object_id=obj.object_id)\
-    )
-    objects = [obj]
-    objdict = {}
-    for rel in rels.all():
-        o = None
-        if rel.source_ref == obj.object_id:
-            if not rel.target_ref.object_id in objdict:
-                o = get_obj_from_id(rel.target_ref)
-                objdict[rel.target_ref.object_id] = o
-        elif rel.target_ref == obj.object_id:
-            if not rel.source_ref.object_id in objdict:
-                o = get_obj_from_id(rel.source_ref)
-                objdict[rel.source_ref.object_id] = o
-        if o:
-            if not o in objects:
-                objects.append(o)
-    return rels, objects
+    print(oids)
+    for oid in oids:
+        print(oid)
+        obj = get_obj_from_id(oid)
+        if obj:
+            objects.append(obj)
+    print(objects)
+    return objects
+
 
 def get_obj_from_id(soi):
     sot = soi.object_id.split('--')[0]
@@ -191,9 +244,15 @@ def get_obj_from_id(soi):
         return obj.all()[0]
     else:
         logging.error("Object not found: "+soi.object_id)
+        if soi.id:
+            soi.delete()
     return None
 
-def object_choices(ids=STIXObjectID.objects.all(), dummy=False):
+def object_choices(
+        #ids=STIXObjectID.objects.all(),
+        ids=[],
+        dummy=False
+    ):
     choices = []
     if dummy:
         choices = [("","----------")]
@@ -340,3 +399,11 @@ class SelectObservableForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super(SelectObservableForm, self).__init__(*args, **kwargs)
         self.fields["indicates"].required = False
+
+def get_model_from_type(type):
+    name = ""
+    for i in type.split("-")[0:2]:
+        name += i.capitalize()
+    m = getattr(mymodels, name)
+    return m
+

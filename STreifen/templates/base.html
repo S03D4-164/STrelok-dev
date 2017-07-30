@@ -25,7 +25,7 @@
 <script type="text/javascript" charset="utf8" src="/static/datetimepicker/build/jquery.datetimepicker.full.min.js"></script>
 {% endblock %}
 
-{% block vislib %}
+{% block visjslib %}
 <link href="/static/vis/vis.min.css" type="text/css" rel="stylesheet"></link>
 <script type="text/javascript" src="/static/vis/vis.min.js"></script>
 <script type="text/javascript" src="/static/js/visnetwork.js"></script>
@@ -49,18 +49,17 @@
 <a href="/">Top</a>
 </li>
 
+<li><a href="/stix/threat-actor/">Threat Actor</a></li>
+
+<li><a href="/stix/malware/">Malware</a></li>
+
 <li><a href="/stix/identity/">Identity</a></li>
 
 <li><a href="/stix/report/">Report</a></li>
 
-<li><a href="/stix/threat-actor/">Threat Actor</a></li>
-
-
-<li><a href="/stix/malware/">Malware</a></li>
+<li><a href="/stix/indicator/">Indicator</a></li>
 
 <li><a href="/stix/campaign/">Campaign</a></li>
-
-<li><a href="/stix/indicator/">Indicator</a></li>
 
 <li><a href="/timeline/">Timeline</a></li>
 
@@ -71,8 +70,6 @@
 </ul>
 </nav>
 {% endblock %}
-
-{% block container %}{% endblock %}
 
 {% block message %}
 {% if messages %}
@@ -85,6 +82,9 @@
 </div>
 {% endif %}
 {% endblock %}
+
+{% block container %}{% endblock %}
+
 
 </div><!--/.container-fluid-->
 

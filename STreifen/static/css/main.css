@@ -35,9 +35,14 @@ div.modal-body input[type="text"] {
     width:100%;
 }
 
-div.modal-body select[multiple]{
+form.create_form select[multiple]{
     //width:100%;
     height:150px;
+}
+
+form.add_form select[multiple]{
+    width:100%;
+    height:200px;
 }
 
 
@@ -47,9 +52,9 @@ div#network {
 }
 
 div.modal-dialog {
-    width: 800px;
+    width: 600px;
 }
 
 div.modal-content {
-    width: 800px;
+    width: 600px;
 }

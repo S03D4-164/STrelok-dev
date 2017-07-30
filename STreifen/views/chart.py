@@ -7,6 +7,13 @@ from ..forms import *
 from collections import OrderedDict
 import json
 
+def chart_view(request):
+    data = stats_ati()
+    c = {
+        "data":data
+    }
+    return render(request, 'chart.html', c)
+
 def target_stats(rels, id=None):
     ati = rels.filter(
         source_ref__object_id__startswith='threat-actor',
@@ -111,20 +118,20 @@ def stats_ati():
             tgt = get_obj_from_id(a.target_ref)
             l = tgt.labels.all()
             tcat = None
-            if l[0]:
-                if l[0].category:
-                    tcat = l[0].category
-                elif l[0].value:
+            if l:
+                #if l[0].category:
+                #    tcat = l[0].category
+                if l[0].value:
                     tcat = l[0].value
-
-            if not tcat in cntbt:
-                cntbt[tcat] = 1
-            elif tcat in cntbt:
-                cntbt[tcat] += 1
-            if not tcat in tgts:
-                tgts[tcat] = [tgt.object_id]
-            elif tcat in tgts:
-                tgts[tcat].append(tgt.object_id)
+            if tcat:
+                if not tcat in cntbt:
+                    cntbt[tcat] = 1
+                elif tcat in cntbt:
+                    cntbt[tcat] += 1
+                if not tcat in tgts:
+                    tgts[tcat] = [tgt.object_id]
+                elif tcat in tgts:
+                    tgts[tcat].append(tgt.object_id)
         d = []
         for tlabel, count in cntbt.items():
             ti = {
