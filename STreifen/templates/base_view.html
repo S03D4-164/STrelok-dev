@@ -142,8 +142,11 @@ $(document).ready(
 </table>
 <input class="btn btn-primary btn-sm" type="submit" name="add_sight" value="Add">
 {% else %}
+{% if obj.object_type.name != "report" %}
 <div id="select_rel" >
-{{obj.object_type.name|capfirst}}:{{obj.name}} {{aoform.relation}}
+{{obj.object_type.name|capfirst}}:{{obj.name}}
+{{aoform.relation}}
+{% endif %}
 <div id="add_rel" >
 {{aoform.objects}}
 </div>
@@ -205,7 +208,7 @@ $(document).ready(
 
 <div id="canvas-container" class="hidden">
 
-<div class="panel panel-primary">
+<div class="panel panel-default">
 <div class="panel-heading">
 <h1 id="header" style="cursor:pointer;">Visualize</h1>
 </div>
@@ -252,11 +255,9 @@ $(document).ready(
 
 <table class="table table-condensed">
 <tr><th class="col-md-2">Name</th><td>{{obj.name}}</td></tr>
-<tr><th >Created</th><td>{{obj.created}}</td></tr>
-<tr><th >Modified</th><td>{{obj.modified}}</td></tr>
 {% block property %}
 {% if obj.object_type.name != "campaign"%}
-<tr><th class="col-md-3">Labels</th>
+<tr><th >Labels</th>
 <td>
 {% for l in obj.labels.all %}
 {{l.value}}<br>
@@ -264,12 +265,15 @@ $(document).ready(
 </td></tr>
 {% endif %}
 {% if obj.object_type.name == "report"%}
+<tr><th >Publisher</th><td>{{obj.created_by_ref}}</td></tr>
 <tr><th >Published</th><td>{{obj.published}}</td></tr>
 {% elif obj.object_type.name == "identity"%}
 <tr><th >Sectors</th><td>{% for s in obj.sectors.all %}{{s}}<br>{% endfor%}</td></tr>
 {% elif obj.object_type.name == "threat-actor" or obj.object_type.name == "campaign" %}
 <tr><th >Alias</th><td>{% for a in obj.aliases.all %}{{a}}<br>{% endfor%}</td></tr>
 {% endif %}
+<tr><th >Created</th><td>{{obj.created}}</td></tr>
+<tr><th >Modified</th><td>{{obj.modified}}</td></tr>
 {% endblock %}
 
 <tr>
@@ -342,7 +346,7 @@ STIX
 {% for r in s.where_sighted_refs.all %}
 {% for o in objects %}
 {% ifequal o.object_id r %}
-<a href="/stix/o.object_id.object_id">
+<a href="/stix/{{o.object_id.object_id}}">
 <span class="label label-default">{{o.object_type.name}}</span><br>
 {{o.name}}</a><br>
 {% endifequal %}
@@ -352,7 +356,7 @@ STIX
 <td>
 {% for o in objects %}
 {% ifequal o.object_id s.sighting_of_ref %}
-<a href="/stix/o.object_id.object_id">
+<a href="/stix/{{o.object_id.object_id}}">
 <span class="label label-default">{{o.object_type.name}}</span><br>
 {{o.name}}</a><br>
 {% endifequal %}
@@ -371,9 +375,10 @@ STIX
 <table class="table table-condensed table-stripe table-hover display" width="100%">
 <thead><tr>
 <th class="col-sm-1"> </th>
-<th class="col-sm-4">Source</th>
-<th class="col-sm-3">Type</th>
-<th class="col-sm-4">Target</th>
+<th class="col-sm-3">Source</th>
+<th class="col-sm-2">Type</th>
+<th class="col-sm-3">Target</th>
+<th class="col-sm-3">Description</th>
 </tr></thead>
 <tbody id=relations_table>
 {% for r in rels %}
@@ -383,7 +388,7 @@ STIX
 {% for s in objects %}
 {% if s.object_id == r.source_ref %}
 <span class="label label-default">{{s.object_type.name}}</span><br>
-<a href="/stix/{{s.object_id}}">{{s.name}}</a>
+<a href="/stix/{{s.object_id.object_id}}">{{s.name}}</a>
 {% endif %}
 {% endfor %}
 </td>
@@ -395,9 +400,12 @@ STIX
 {% for t in objects %}
 {% if t.object_id == r.target_ref %}
 <span class="label label-default">{{t.object_type.name}}</span><br>
-<a href="/stix/{{t.object_id}}">{{t.name}}</a>
+<a href="/stix/{{t.object_id.object_id}}">{{t.name}}</a>
 {% endif %}
 {% endfor %}
+</td>
+<td>
+{{r.description}}
 </td>
 </tr>
 {% endfor %}
@@ -423,7 +431,7 @@ STIX
 <tbody >
 {% for o in objects %}
 <tr>
-<td><a href="/stix/{{o.object_id}}">{{o.name}}</a></td>
+<td><a href="/stix/{{o.object_id.object_id}}">{{o.name}}</a></td>
 <td>{{o.object_type.name}}</td>
 <td>{% for l in o.labels.all %}{{l}}<br>{% endfor %}</td>
 <!--<td>{{o.object_id.object_id}}</td>-->

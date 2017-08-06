@@ -12,10 +12,16 @@ from .timeline import stix2timeline
 import re, json, requests
 import stix2
 
-def stix2_json(request, id):
-    obj = STIXObject.objects.get(object_id__object_id=id)
-    objs = get_related_obj(obj)
-    print(objs)
+def stix2_json(request, id=None):
+    objs = []
+    if not id:
+        for i in STIXObjectID.objects.all():
+            o = get_obj_from_id(i)
+            if o:
+                objs.append(get_obj_from_id(i))
+    else:
+        obj = STIXObject.objects.get(object_id__object_id=id)
+        objs = get_related_obj(obj)
     bundle = stix_bundle(objs)
     j = json.dumps(json.loads(str(bundle)), indent=2)
     return HttpResponse(j,  content_type="application/json")
@@ -29,17 +35,23 @@ def stix2type_json(request, type):
 
 def rel2db(rel, objs):
     src_id = rel["source_ref"]
-    src = objs[src_id]
+    src = None
+    if src_id in objs:
+        src = objs[src_id]
     tgt_id = rel["target_ref"]
-    tgt = objs[tgt_id]
+    tgt = None
+    if tgt_id in objs:
+        tgt = objs[tgt_id]
     type = None
     if "relationship_type" in rel:
-        type = RelationshipType.objects.get(name=rel["relationship_type"])
+        type = RelationshipType.objects.get(
+            name=rel["relationship_type"]
+        )
     dscr = None
     if "description" in rel:
         dscr = rel["description"]
     if src and tgt and type:
-        print(src,type,tgt)
+        #print(src,type,tgt)
         r, cre = Relationship.objects.get_or_create(
             relationship_type=type,
             source_ref=src.object_id,
@@ -48,33 +60,38 @@ def rel2db(rel, objs):
         )
 
 def sight2db(sight, objs):
-    print(sight)
-    print(objs)
     wsrs = []
-    for w in sight["where_sighted_refs"]:
-        sdo = objs[w]
-        wsrs.append(sdo)
-    print(wsrs)
-    sid = sight["sighting_of_ref"]
-    sor = objs[sid]
+    if "where_sighted_refs" in sight:
+        for w in sight["where_sighted_refs"]:
+            sdo = objs[w]
+            wsrs.append(sdo)
+    sor = None
+    if "sighting_of_ref" in sight:
+        sid = sight["sighting_of_ref"]
+        if sid in objs:
+            sor = objs[sid]
     first_seen = None
     if "first_seen" in sight:
         first_seen = sight["first_seen"]
     last_seen = None
     if "last_seen" in sight:
         last_seen = sight["last_seen"]
-    print(wsrs, sor, first_seen)
     if wsrs and sor and first_seen:
-        s, cre = Sighting.objects.get_or_create(
+        s = Sighting.objcts.filter(
             first_seen=first_seen,
             last_seen=last_seen,
             sighting_of_ref=sor.object_id,
+            where_sighted_refs__in=wsrs,
         )
-        for wsr in wsrs:
-            print(wsr)
-            print(wsr.object_id)
-            s.where_sighted_refs.add(wsr.object_id)
-            s.save()
+        if not s:
+            s = Sighting.objects.create(
+                first_seen=first_seen,
+                last_seen=last_seen,
+                sighting_of_ref=sor.object_id,
+            )
+            for wsr in wsrs:
+                s.where_sighted_refs.add(wsr.object_id)
+                s.save()
 
 def stix2_db(obj):
     if "type" in obj:
@@ -107,6 +124,44 @@ def stix2_db(obj):
                     m.labels.add(l)
             m.save()
             return m
+        elif type == 'tool':
+            t, cre = model.objects.get_or_create(name=obj["name"])
+            if "description" in obj:
+                t.description = obj["description"]
+            if "labels" in obj:
+                labels = obj["labels"]
+                for label in labels: 
+                    l, cre = ToolLabel.objects.get_or_create(value=label)
+                    t.labels.add(l)
+            t.save()
+            return t
+        elif type == 'attack-pattern':
+            a, cre = model.objects.get_or_create(name=obj["name"])
+            if "description" in obj:
+                a.description = obj["description"]
+            a.save()
+            return a
+        elif type == 'vulnerability':
+            v, cre = model.objects.get_or_create(name=obj["name"])
+            if "description" in obj:
+                v.description = obj["description"]
+            v.save()
+            return v
+        elif type == 'campaign':
+            c, cre = model.objects.get_or_create(name=obj["name"])
+            if "description" in obj:
+                c.description = obj["description"]
+            if "first_seen" in obj:
+                c.first_seen = obj["first_seen"]
+            if "last_seen" in obj:
+                c.last_seen = obj["last_seen"]
+            if "aliases" in obj:
+                aliases = obj["aliases"]
+                for alias in aliases: 
+                    a, cre = CampaignAlias.objects.get_or_create(name=alias)
+                    c.aliases.add(a)
+            c.save()
+            return c
         elif type == 'identity':
             i, cre = model.objects.get_or_create(name=obj["name"])
             if "description" in obj:
@@ -150,6 +205,15 @@ def stix_bundle(objs):
                 modified=obj.modified,
             )
             objects += (a,)
+        elif obj.object_type.name == 'vulnerability':
+            v = stix2.Vulnerability(
+                id=obj.object_id.object_id,
+                name=obj.name,
+                description=obj.description,
+                created=obj.created,
+                modified=obj.modified,
+            )
+            objects += (v,)
         elif obj.object_type.name == 'malware':
             m = stix2.Malware(
                 id=obj.object_id.object_id,
@@ -160,13 +224,27 @@ def stix_bundle(objs):
                 modified=obj.modified,
             )
             objects += (m,)
+        elif obj.object_type.name == 'tool':
+            t = stix2.Tool(
+                id=obj.object_id.object_id,
+                name=obj.name,
+                description=obj.description,
+                labels=[str(l.value) for l in obj.labels.all()],
+                created=obj.created,
+                modified=obj.modified,
+            )
+            objects += (t,)
         elif obj.object_type.name == 'indicator':
+            pattern = []
+            for p in obj.pattern.all():
+                pattern.append("(" + p.pattern + ")")
+            pattern = "[" + " OR ".join(sorted(pattern)) + "]"
             i = stix2.Indicator(
                 id=obj.object_id.object_id,
                 name=obj.name,
                 description=obj.description,
                 labels=[str(l.value) for l in obj.labels.all()],
-                pattern=[str(p.value) for p in obj.pattern.all()],
+                pattern=pattern,
                 created=obj.created,
                 modified=obj.modified,
             )
@@ -187,12 +265,25 @@ def stix_bundle(objs):
                 id=obj.object_id.object_id,
                 name=obj.name,
                 description=obj.description,
-                #labels=[str(l.value) for l in obj.labels.all()],
                 aliases=[str(a.name) for a in obj.aliases.all()],
                 created=obj.created,
                 modified=obj.modified,
+                first_seen=obj.first_seen,
+                last_seen=obj.last_seen,
             )
             objects += (c,)
+        elif obj.object_type.name == 'intrusion-set':
+            i = stix2.IntrusionSet(
+                id=obj.object_id.object_id,
+                name=obj.name,
+                description=obj.description,
+                aliases=[str(a.name) for a in obj.aliases.all()],
+                created=obj.created,
+                modified=obj.modified,
+                first_seen=obj.first_seen,
+                #last_seen=obj.last_seen,
+            )
+            objects += (i,)
         elif obj.object_type.name == 'relationship':
             r = stix2.Relationship(
                 id=obj.object_id.object_id,
@@ -251,12 +342,19 @@ def stix_view(request):
                             #sdos[o["id"]] = o
                             sdo = stix2_db(o)
                             sdos[o["id"]] = sdo
-                    print(sdos)
-                    print(rels)
                     for i in rels:
                         rel2db(rels[i], sdos)
                     for i in sights:
                         sight2db(sights[i], sdos)
+        elif 'export' in request.POST:
+            objs = []
+            for i in STIXObjectID.objects.all():
+                o = get_obj_from_id(i)
+                if o:
+                    objs.append(get_obj_from_id(i))
+            bundle = stix_bundle(objs)
+            j = json.dumps(json.loads(str(bundle)), indent=2)
+            return HttpResponse(j,  content_type="application/json")
         elif 'timeline' in request.POST:
             form = InputForm(request.POST)
             if form.is_valid():

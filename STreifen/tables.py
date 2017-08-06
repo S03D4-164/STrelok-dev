@@ -1,4 +1,5 @@
 from django_datatables_view.base_datatable_view import BaseDatatableView
+from django.apps import apps
 from .models import *
 from .forms import *
 
@@ -21,7 +22,7 @@ class ReportData(BaseDatatableView):
             else:
                 return None
         elif column == 'name':
-            return '<a href="/stix/{0}">{1}</a>'.format(row.object_id,row.name)
+            return '<a href="/stix/{0}">{1}</a>'.format(row.object_id.object_id,row.name)
         elif column == 'object_refs':
             return row.object_refs.count()
         elif column == 'created_by_ref':
@@ -45,7 +46,7 @@ class CampaignData(BaseDatatableView):
         if column == 'id':
             return '<a class="btn btn-default btn-xs">{0}</button>'.format(row.id)
         elif column == 'name':
-            return '<a href="/stix/{0}">{1}</a>'.format(row.object_id,row.name)
+            return '<a href="/stix/{0}">{1}</a>'.format(row.object_id.object_id,row.name)
         elif column == 'aliases':
             a = []
             for alias in row.aliases.all():
@@ -65,7 +66,7 @@ class ThreatActorData(BaseDatatableView):
         if column == 'id':
             return '<a class="btn btn-default btn-xs">{0}</button>'.format(row.id)
         elif column == 'name':
-            return '<a href="/stix/{0}">{1}</a>'.format(row.object_id,row.name)
+            return '<a href="/stix/{0}">{1}</a>'.format(row.object_id.object_id,row.name)
         elif column == 'aliases':
             a = []
             for alias in row.aliases.all():
@@ -90,7 +91,7 @@ class MalwareData(BaseDatatableView):
         if column == 'id':
             return '<a class="btn btn-default btn-xs">{0}</button>'.format(row.id)
         elif column == 'name':
-            return '<a href="/stix/{0}">{1}</a>'.format(row.object_id,row.name)
+            return '<a href="/stix/{0}">{1}</a>'.format(row.object_id.object_id,row.name)
         elif column == 'labels':
             l = []
             for label in row.labels.all():
@@ -106,17 +107,24 @@ class MalwareData(BaseDatatableView):
                 | qs.filter(name__iregex=search)
         return qs.distinct()
 
-class ObservablePropertyData(BaseDatatableView):
-    model = ObservableProperty
-    columns = ['key', 'value']
-    order_columns = ['key', 'value']
+class ObservableObjectData(BaseDatatableView):
+    model = ObservableObject
+    columns = ['id', 'type']
+    order_columns = ['id', 'type']
     max_display_length = 100
     def render_column(self, row, column):
-        if column == 'key':
-            p = row.key.type.name + ":" + row.key.name
-            return p
+        if column == 'type':
+            t = row.type.name
+            if row.type.model_name:
+                m = apps.get_model(row._meta.app_label, row.type.model_name)
+                o = m.objects.get(id=row.id)
+                if hasattr(o, "name"):
+                    return t + ":" + o.name
+                elif hasattr(o, "value"):
+                    return t + ":" + o.value
+            return row.type.name
         else:
-            return super(ObservablePropertyData, self).render_column(row, column)
+            return super(ObservableObjectData, self).render_column(row, column)
 
 class IndicatorPatternData(BaseDatatableView):
     model = IndicatorPattern
@@ -137,17 +145,10 @@ class IndicatorData(BaseDatatableView):
     max_display_length = 100
     def render_column(self, row, column):
         if column == 'pattern':
-            pattern = ""
-            for p in row.pattern.all():
-                """
-                pattern += p.property.type.name
-                pattern += ":" + p.property.name
-                """
-                pattern += p.property.alias
-                pattern += "=" + p.value + "<br>"
-            return pattern
+            pattern = " OR ".join(sorted(row.pattern.all().values_list("pattern", flat=True)))
+            return "[" + pattern + "]"
         elif column == 'name':
-            return '<a href="/stix/{0}">{1}</a>'.format(row.object_id,row.name)
+            return '<a href="/stix/{0}">{1}</a>'.format(row.object_id.object_id,row.name)
         else:
             return super(IndicatorData, self).render_column(row, column)
 
@@ -160,7 +161,7 @@ class IdentityData(BaseDatatableView):
         if column == 'id':
             return '<a onclick=ChangeRight({0}) class="btn btn-default btn-xs">{0}</button>'.format(row.id)
         elif column == 'name':
-            return '<a href="/stix/{0}">{1}</a>'.format(row.object_id,row.name)
+            return '<a href="/stix/{0}">{1}</a>'.format(row.object_id.object_id,row.name)
         elif column == 'labels':
             l = ""
             for label in row.labels.all():

@@ -45,14 +45,17 @@
 {% block table %}
 <div id="tables" class="col-md-12">
 <div class="panel panel-default">
-<div class="panel-heading">STIX</div>
+<div class="panel-heading">
+STIX
+<a class="btn btn-default btn-xs" href="/stix/all.json">Export All</a>
+</div>
 <div class="panel-body">
 <form method="post">{% csrf_token %}
 Parse
 <button type="button" id="viz" onclick=toggleViz("id_input") >Text</button>
 <input type="submit" name="parse_url" value="URL">
-<input type="submit" name="import" value="Import">
 {{form.input}}
+<input type="submit" name="import" value="Import">
 </form>
 </div><!--/.panel-body-->
 </div><!--/.panel-->

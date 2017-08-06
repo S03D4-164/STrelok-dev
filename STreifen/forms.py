@@ -180,6 +180,9 @@ class SelectObjectForm(forms.Form):
                 "identity",
                 "attack-pattern",
                 "malware",
+                "campaign",
+                "tool",
+                "vulnerability",
                 "threat-actor",
                 "relationship",
                 "sighting",
@@ -221,6 +224,7 @@ def get_related_obj(sdo):
         print(sights)
         ids += sights.values_list("object_id", flat=True)
         ids += sights.values_list("sighting_of_ref", flat=True)
+        ids += sights.values_list("where_sighted_refs", flat=True)
     oids = STIXObjectID.objects.filter(
         id__in=ids
     )
@@ -234,7 +238,7 @@ def get_related_obj(sdo):
     return objects
 
 
-def get_obj_from_id(soi):
+def _get_obj_from_id(soi):
     sot = soi.object_id.split('--')[0]
     m = ""
     for s in sot.split('-'):
@@ -340,8 +344,7 @@ class ReportForm(forms.ModelForm):
         self.fields["created_by_ref"].choices = object_choices(
             ids=STIXObjectID.objects.filter(
                 object_id__startswith="identity--",
-            ),
-            dummy=True
+            ),dummy=True
         )
 
 class TypeSelectForm(forms.Form):
@@ -359,6 +362,11 @@ class TypeSelectForm(forms.Form):
         self.fields["relation"].required = False
 
 class IndicatorForm(forms.ModelForm):
+    observable = forms.CharField(
+        widget=forms.Textarea(
+            attrs={'style':'height:200px;'}
+        )
+    )
     class Meta:
         model = Indicator
         fields = [
@@ -367,7 +375,7 @@ class IndicatorForm(forms.ModelForm):
             "description",
             "valid_from",
             "valid_until",
-            "pattern",
+            #"pattern",
         ]
 
 class PatternForm(forms.ModelForm):

@@ -24,15 +24,17 @@ $(document).ready(
             "ajax": "/data/{{type}}",
             "order":[0, 'desc'],
         });
-	$('#pattern_table').dataTable({
+	$('#obs_table').dataTable({
             "processing":true,
             "serverSide":true,
             "ajax": "/data/observable",
             "order":[0, 'desc'],
         });
-        $('#id_published').datetimepicker({
-            format:'Y-m-d H:i'
-        });
+        $('#id_published').datetimepicker({format:'Y-m-d H:i'});
+        $('#id_first_seen').datetimepicker({format:'Y-m-d H:i'});
+        $('#id_last_seen').datetimepicker({format:'Y-m-d H:i'});
+        $('#id_valid_from').datetimepicker({format:'Y-m-d H:i'});
+        $('#id_valid_until').datetimepicker({format:'Y-m-d H:i'});
         {% if type == "threat-actor" %}
         actorChart({{data|safe}});
         {% endif %}
@@ -129,15 +131,13 @@ $(document).ready(
 {% block right_pane %}
 {% if type == "indicator" %}
 <div id="left_pane" class="col-md-6">
-<h3 style="margin-top: 0">{{type|capfirst}}
-<a class="btn btn-primary btn-sm" data-toggle="modal" href="#create_form">Create</a>
-<a class="btn btn-primary btn-sm" data-toggle="modal" href="#bulk_form">Bulk Create</a>
+<h3 style="margin-top: 0">Observable Objects
 </h3>
 <hr>
-<table id="pattern_table" class="table table-condensed table-stripe table-hover display" width="100%">
+<table id="obs_table" class="table table-condensed table-stripe table-hover display" width="100%">
 <thead><tr>
-<th >Created</th>
-<th >Name</th>
+<th >ID</th>
+<th class="col-md-10">Type</th>
 </tr></thead>
 </table>
 </div><!--/#left_pane-->

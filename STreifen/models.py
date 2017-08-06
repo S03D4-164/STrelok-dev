@@ -1,7 +1,9 @@
 from django.db import models
+from django.apps import apps
 
 class STIXObjectType(models.Model):
     name = models.CharField(max_length=250, unique=True)
+    model_name = models.CharField(max_length=250, blank=True, null=True)
     def __str__(self):
         return self.name
     class Meta:
@@ -9,10 +11,34 @@ class STIXObjectType(models.Model):
 
 class STIXObjectID(models.Model):
     object_id = models.CharField(max_length=250, unique=True)
-    def __str__(self):
-        return self.object_id
+    #def __str__(self):
+    #    return self.object_id
     class Meta:
         ordering = ["object_id"]
+    def __str__(self):
+        #if self.object_type.model_name:
+        #    m = apps.get_model(self._meta.app_label, self.object_type.model_name)
+        #    o = m.objects.get(id=self.id)
+        o = get_obj_from_id(self)
+        if o:
+            if hasattr(o, "name"):
+                return ":".join([o.object_type.name, o.name])
+            elif o.object_type.name == "relationship":
+                s = get_obj_from_id(o.source_ref)
+                t = get_obj_from_id(o.target_ref)
+                if s and t:
+                    r = " ".join([s.name, o.relationship_type.name, t.name])
+                    return ":".join([o.object_type.name, r])
+            elif o.object_type.name == "sighting":
+                wsrs = []
+                for wsr in o.where_sighted_refs.all():
+                    w = get_obj_from_id(wsr)
+                    wsrs.append(w.name)
+                s = get_obj_from_id(o.sighting_of_ref)
+                if wsrs and s:
+                    sighted = ",".join(wsrs) +" sighted "+ s.name
+                    return o.object_type.name +":"+ sighted
+        return self.object_id
 
 class RelationshipType(models.Model):
     name = models.CharField(max_length=250, unique=True)
@@ -32,12 +58,23 @@ class DefinedRelationship(models.Model):
         unique_together = (("source", "type", "target"),)
         ordering = ["source", "type", "target"]
 
+def get_obj_from_id(oid):
+    so = STIXObject.objects.filter(object_id=oid)
+    if so.count() == 1:
+        so = so[0]
+        if so.object_type.model_name:
+            m = apps.get_model(so._meta.app_label, so.object_type.model_name)
+            o = m.objects.get(id=so.id)
+            return o
+    return None
+
 class STIXObject(models.Model):
     object_type = models.ForeignKey(STIXObjectType, blank=True, null=True)
     object_id = models.OneToOneField(STIXObjectID, blank=True, null=True)
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
     created_by_ref = models.ForeignKey(STIXObjectID, related_name="createdby_ref", blank=True, null=True)
+    confidence = models.PositiveSmallIntegerField(blank=True, null=True)
     #object_marking_refs = models.ManyToManyField(STIXObjectID, blank=True)
     class Meta:
         unique_together = (("object_type", "object_id"),)
@@ -45,6 +82,26 @@ class STIXObject(models.Model):
     def delete(self):
         STIXObjectID.objects.get(object_id=self.object_id).delete()
     def __str__(self):
+        if self.object_type.model_name:
+            m = apps.get_model(self._meta.app_label, self.object_type.model_name)
+            o = m.objects.get(id=self.id)
+            if hasattr(o, "name"):
+                return ":".join([o.object_type.name, o.name])
+            elif o.object_type.name == "relationship":
+                s = get_obj_from_id(o.source_ref)
+                t = get_obj_from_id(o.target_ref)
+                if s and t:
+                    r = " ".join([s.name, o.relationship_type.name, t.name])
+                    return ":".join([o.object_type.name, r])
+            elif o.object_type.name == "sighting":
+                wsrs = []
+                for wsr in o.where_sighted_refs.all():
+                    w = get_obj_from_id(wsr)
+                    wsrs.append(w.name)
+                s = get_obj_from_id(o.sighting_of_ref)
+                if wsrs and s:
+                    sighted = ",".join(wsrs) +" sighted "+ s.name
+                    return o.object_type.name +":"+ sighted
         return self.object_id.object_id
 
 class MarkingDefinition(STIXObject):
@@ -83,7 +140,7 @@ def _set_id(obj, name):
 
 class Report(STIXObject):
     name = models.CharField(max_length=250, unique=True)
-    labels = models.ManyToManyField(ReportLabel, blank=True)
+    labels = models.ManyToManyField(ReportLabel)
     description = models.TextField(blank=True, null=True)
     published = models.DateTimeField(blank=True, null=True)
     object_refs = models.ManyToManyField(STIXObjectID, blank=True)
@@ -183,6 +240,17 @@ class Malware(STIXObject):
     class Meta:
         ordering = ["name"]
 
+class Vulnerability(STIXObject):
+    name = models.CharField(max_length=250, unique=True)
+    description = models.TextField(blank=True, null=True)
+    def save(self, *args, **kwargs):
+        self = _set_id(self, 'Vulnerability')
+        super(Vulnerability, self).save(*args, **kwargs)
+    def __str__(self):
+        return self.name
+    class Meta:
+        ordering = ["name"]
+
 class ThreatActorLabel(models.Model):
     value = models.CharField(max_length=250, unique=True)
     def __str__(self):
@@ -248,6 +316,7 @@ class IndicatorLabel(models.Model):
 
 class ObservableObjectType(models.Model):
     name = models.CharField(max_length=250, unique=True)
+    model_name = models.CharField(max_length=250, unique=True, null=True, blank=True)
     def __str__(self):
         return self.name
     class Meta:
@@ -278,29 +347,65 @@ class ObservableProperty(models.Model):
         ordering = ["key", "value"]
 
 class ObservableObject(models.Model):
+    object_id = models.CharField(max_length=250, unique=True, blank=True, null=True)
     type = models.ForeignKey(ObservableObjectType)
-    property = models.ManyToManyField(ObservableProperty)
     description = models.TextField(blank=True, null=True)
+    """
+    property = models.ManyToManyField(ObservableProperty)
+    """
     def __str__(self):
-        v = []
-        for p in self.property.all():
-            v.append(p.value)
-        return "/".join(v)
+        if self.type.model_name:
+            m = apps.get_model(self._meta.app_label, self.type.model_name)
+            o = m.objects.get(id=self.id)
+            if hasattr(o, "name"):
+                return o.name
+            elif hasattr(o, "value"):
+                return o.value
+        return str(self.id)
+
+class DomainNameObject(ObservableObject):
+    value = models.CharField(max_length=25000, unique=True)
+    resolve_to_refs = models.ManyToManyField(ObservableObject, related_name="resolve_to_refs", blank=True)
+    def __str__(self):
+        return self.value
+    class Meta:
+        ordering = ["value"]
+
+class IPv4AddressObject(ObservableObject):
+    value = models.CharField(max_length=15, unique=True)
+    #resolve_to_refs = models.ManyToManyField(ObservableObject)
+    def __str__(self):
+        return self.value
+    class Meta:
+        ordering = ["value"]
+
+class URLObject(ObservableObject):
+    value = models.CharField(max_length=25000, unique=True)
+    def __str__(self):
+        return self.value
+    class Meta:
+        ordering = ["value"]
+
+class FileObject(ObservableObject):
+    name = models.CharField(max_length=25000, unique=True)
+    hashes_md5 = models.CharField(max_length=250, null=True, blank=True)
+    hashes_sha1 = models.CharField(max_length=250, null=True, blank=True)
+    hashes_sha256 = models.CharField(max_length=250, null=True, blank=True)
+    contains_refs = models.ManyToManyField(ObservableObject, related_name="contains_refs", blank=True)
+    def __str__(self):
+        return self.name
+    class Meta:
+        ordering = ["name"]
 
 class IndicatorPattern(models.Model):
+    pattern = models.TextField()
     observable = models.ManyToManyField(ObservableObject)
-    pattern = models.TextField(blank=True, null=True)
     """
     property = models.ForeignKey(ObservableObjectProperty)
     value = models.CharField(max_length=25000)
-    def __str__(self):
-        o = self.property.type.name + ":" + self.property.name
-        o += "=" + self.value
-        return o
     class Meta:
         unique_together = (("property", "value"),)
         ordering = ["property", "value"]
-
     """
 
 class Indicator(STIXObject):
@@ -331,6 +436,32 @@ class Campaign(STIXObject):
     def save(self, *args, **kwargs):
         self = _set_id(self, 'campaign')
         super(Campaign, self).save(*args, **kwargs)
+    def __str__(self):
+        return self.name
+    class Meta:
+        ordering = ["name"]
+
+class IntrusionSetAlias(models.Model):
+    name = models.CharField(max_length=250, unique=True, blank=False)
+    def __str__(self):
+        return self.name
+    class Meta:
+        ordering = ["name"]
+
+class IntrusionSet(STIXObject):
+    name = models.CharField(max_length=250, unique=True)
+    description = models.TextField(blank=True, null=True)
+    #labels = models.ManyToManyField(IndicatorLabel)
+    aliases = models.ManyToManyField(IntrusionSetAlias, blank=True)
+    first_seen = models.DateTimeField(blank=True, null=True)
+    last_seen = models.DateTimeField(blank=True, null=True)
+    def save(self, *args, **kwargs):
+        self = _set_id(self, 'intrusion-set')
+        super(IntrusionSet, self).save(*args, **kwargs)
+    def __str__(self):
+        return self.name
+    class Meta:
+        ordering = ["name"]
 
 class TaxiiCollection(models.Model):
     collection_id = models.CharField(max_length=250, unique=True, blank=True, null=True)
