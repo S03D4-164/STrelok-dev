@@ -58,13 +58,15 @@ def rel2db(rel, objs):
             target_ref=tgt.object_id,
             description=dscr,
         )
+        return r
+    return None
 
 def sight2db(sight, objs):
     wsrs = []
     if "where_sighted_refs" in sight:
         for w in sight["where_sighted_refs"]:
             sdo = objs[w]
-            wsrs.append(sdo)
+            wsrs.append(sdo.object_id)
     sor = None
     if "sighting_of_ref" in sight:
         sid = sight["sighting_of_ref"]
@@ -77,7 +79,7 @@ def sight2db(sight, objs):
     if "last_seen" in sight:
         last_seen = sight["last_seen"]
     if wsrs and sor and first_seen:
-        s = Sighting.objcts.filter(
+        s = Sighting.objects.filter(
             first_seen=first_seen,
             last_seen=last_seen,
             sighting_of_ref=sor.object_id,
@@ -90,8 +92,38 @@ def sight2db(sight, objs):
                 sighting_of_ref=sor.object_id,
             )
             for wsr in wsrs:
-                s.where_sighted_refs.add(wsr.object_id)
+                #s.where_sighted_refs.add(wsr.object_id)
+                s.where_sighted_refs.add(wsr)
                 s.save()
+        return s
+    return None
+
+def rep2db(rep, objs):
+    print(rep)
+    r = None
+    if "name" in rep:
+        if rep["name"]:
+            r, cre = Report.objects.get_or_create(name=rep["name"])
+    if r:
+        if "published" in rep:
+            r.published = rep['published']
+        if "description" in rep:
+            r.description = rep['description']
+        if "labels" in rep:
+            labels = rep["labels"]
+            for label in labels: 
+                l = ReportLabel.objects.filter(value=label)
+                if l.count() == 1:
+                    r.labels.add(l[0])
+        refs = []
+        if "object_refs" in rep:
+            for ref in rep["object_refs"]:
+                sdo = objs[ref]
+                refs.append(sdo.object_id)
+        if refs:
+            r.object_refs.add(*refs)
+        r.save()
+    return r
 
 def stix2_db(obj):
     if "type" in obj:
@@ -235,16 +267,15 @@ def stix_bundle(objs):
             )
             objects += (t,)
         elif obj.object_type.name == 'indicator':
-            pattern = []
-            for p in obj.pattern.all():
-                pattern.append("(" + p.pattern + ")")
-            pattern = "[" + " OR ".join(sorted(pattern)) + "]"
+            pattern = ""
+            if obj.pattern:
+                pattern = obj.pattern.pattern
             i = stix2.Indicator(
                 id=obj.object_id.object_id,
                 name=obj.name,
                 description=obj.description,
                 labels=[str(l.value) for l in obj.labels.all()],
-                pattern=pattern,
+                pattern= "[" + pattern + "]",
                 created=obj.created,
                 modified=obj.modified,
             )
@@ -307,6 +338,9 @@ def stix_bundle(objs):
             )
             objects += (s,)
         elif obj.object_type.name == 'report':
+            created_by = None
+            if obj.created_by_ref:
+                created_by=obj.created_by_ref.object_id
             r = stix2.Report(
                 id=obj.object_id.object_id,
                 labels=[str(l.value) for l in obj.labels.all()],
@@ -314,6 +348,7 @@ def stix_bundle(objs):
                 description=obj.description,
                 published=obj.published,
                 object_refs=[str(r.object_id) for r in obj.object_refs.all()],
+                created_by_ref=created_by,
                 created=obj.created,
                 modified=obj.modified,
             )
@@ -333,19 +368,28 @@ def stix_view(request):
                     sdos = {}
                     rels = {}
                     sights = {}
+                    reps = {}
                     for o in stix["objects"]:
                         if o["type"] == "relationship":
                             rels[o["id"]] = o
                         elif o["type"] == "sighting":
                             sights[o["id"]] = o
+                        elif o["type"] == "report":
+                            reps[o["id"]] = o
                         else:
                             #sdos[o["id"]] = o
                             sdo = stix2_db(o)
                             sdos[o["id"]] = sdo
                     for i in rels:
-                        rel2db(rels[i], sdos)
+                        res = rel2db(rels[i], sdos)
+                        if res:
+                            sdos[i] = res
                     for i in sights:
                         sight2db(sights[i], sdos)
+                        if res:
+                            sdos[i] = res
+                    for i in reps:
+                        rep2db(reps[i], sdos)
         elif 'export' in request.POST:
             objs = []
             for i in STIXObjectID.objects.all():

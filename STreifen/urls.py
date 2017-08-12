@@ -5,7 +5,7 @@ from .views.sdo import sdo_list,sdo_view
 from .views.drs import viz_drs, data_drs
 from .views.stix import stix_view ,stix2_json, stix2type_json
 from .views.taxii import taxii_discovery, taxii_collection, taxii_get_objects
-from .views.timeline import viz_timeline, data_timeline
+from .views.timeline import viz_timeline, data_timeline, timeline_view
 from .views.chart import chart_view
 from .tables import *
 
@@ -34,5 +34,6 @@ urlpatterns = [
     url(r'^taxii/api/collections/$', taxii_collection),
     url(r'^taxii/$', taxii_discovery),
     url(r'^viz/drs/$', viz_drs),
-    url(r'^timeline/$', viz_timeline),
+    url(r'^timeline/(?P<id>[a-z\-]+--[0-9a-f\-]+)$', timeline_view),
+    url(r'^timeline/$', timeline_view),
 ]

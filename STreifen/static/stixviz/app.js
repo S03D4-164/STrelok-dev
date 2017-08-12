@@ -15,7 +15,7 @@ function resizeCanvas() {
   //var cWidth = document.getElementById('legend').offsetLeft - 100;
   //var cHeight = window.innerHeight - document.getElementsByTagName('h1')[0].offsetHeight - 150;
   var cWidth = window.innerWidth * 5 / 10;
-  var cHeight = window.innerHeight * 7 / 10;
+  var cHeight = window.innerHeight * 6 / 10;
   document.getElementById('canvas-wrapper').style.width = cWidth + "px";
   canvas.style.width = cWidth + "px";
   canvas.style.height = cHeight + "px";

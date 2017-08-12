@@ -26,8 +26,11 @@ class ReportData(BaseDatatableView):
         elif column == 'object_refs':
             return row.object_refs.count()
         elif column == 'created_by_ref':
-            c = get_obj_from_id(row.created_by_ref)
-            return c.name
+            name = ""
+            if row.created_by_ref:
+                c = get_obj_from_id(row.created_by_ref)
+                name = c.name
+            return name
         else:
             return super(ReportData, self).render_column(row, column)
     def filter_queryset(self, qs):
@@ -145,7 +148,10 @@ class IndicatorData(BaseDatatableView):
     max_display_length = 100
     def render_column(self, row, column):
         if column == 'pattern':
-            pattern = " OR ".join(sorted(row.pattern.all().values_list("pattern", flat=True)))
+            pattern = ""
+            if row.pattern:
+                pattern = row.pattern.pattern
+            #pattern = " OR ".join(sorted(row.pattern.all().values_list("pattern", flat=True)))
             return "[" + pattern + "]"
         elif column == 'name':
             return '<a href="/stix/{0}">{1}</a>'.format(row.object_id.object_id,row.name)

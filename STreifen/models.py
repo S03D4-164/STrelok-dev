@@ -16,6 +16,7 @@ class STIXObjectID(models.Model):
     class Meta:
         ordering = ["object_id"]
     def __str__(self):
+        #return self.object_id
         #if self.object_type.model_name:
         #    m = apps.get_model(self._meta.app_label, self.object_type.model_name)
         #    o = m.objects.get(id=self.id)
@@ -73,14 +74,14 @@ class STIXObject(models.Model):
     object_id = models.OneToOneField(STIXObjectID, blank=True, null=True)
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
-    created_by_ref = models.ForeignKey(STIXObjectID, related_name="createdby_ref", blank=True, null=True)
+    created_by_ref = models.ForeignKey(STIXObjectID, related_name="created_by_ref", blank=True, null=True)
     confidence = models.PositiveSmallIntegerField(blank=True, null=True)
     #object_marking_refs = models.ManyToManyField(STIXObjectID, blank=True)
     class Meta:
         unique_together = (("object_type", "object_id"),)
         ordering = ["object_type", "object_id"]
-    def delete(self):
-        STIXObjectID.objects.get(object_id=self.object_id).delete()
+    #def delete(self):
+    #    STIXObjectID.objects.get(object_id=self.object_id).delete()
     def __str__(self):
         if self.object_type.model_name:
             m = apps.get_model(self._meta.app_label, self.object_type.model_name)
@@ -154,11 +155,19 @@ class Report(STIXObject):
 
 class IdentityLabel(models.Model):
     value = models.CharField(max_length=250, unique=True)
-    category = models.CharField(max_length=250, blank=True, null=True)
+    #category = models.CharField(max_length=250, blank=True, null=True)
     def __str__(self):
         return self.value
     class Meta:
         ordering = ["value"]
+
+class IndustrialClassification(models.Model):
+    group = models.CharField(max_length=250, unique=True)
+    label = models.ManyToManyField(IdentityLabel)
+    def __str__(self):
+        return self.group
+    class Meta:
+        ordering = ["group"]
 
 class IndustrySector(models.Model):
     value = models.CharField(max_length=250, unique=True)
@@ -244,7 +253,7 @@ class Vulnerability(STIXObject):
     name = models.CharField(max_length=250, unique=True)
     description = models.TextField(blank=True, null=True)
     def save(self, *args, **kwargs):
-        self = _set_id(self, 'Vulnerability')
+        self = _set_id(self, 'vulnerability')
         super(Vulnerability, self).save(*args, **kwargs)
     def __str__(self):
         return self.name
@@ -294,18 +303,6 @@ class Relationship(STIXObject):
         self = _set_id(self, 'relationship')
         super(Relationship, self).save(*args, **kwargs)
 
-class Sighting(STIXObject):
-    sighting_of_ref= models.ForeignKey(STIXObjectID, related_name='sighting_of_ref')
-    where_sighted_refs = models.ManyToManyField(STIXObjectID, related_name='where_sighted_ref')
-    first_seen = models.DateTimeField()
-    last_seen = models.DateTimeField(blank=True, null=True)
-    #observed_data_refs = models.ManyToManyField(STIXObjectID, related_name='observed_data_refs')
-    description = models.TextField(blank=True, null=True)
-    def save(self, *args, **kwargs):
-        self = _set_id(self, 'sighting')
-        super(Sighting, self).save(*args, **kwargs)
-    def __str__(self):
-        return self.object_id.object_id
 
 class IndicatorLabel(models.Model):
     value = models.CharField(max_length=250, unique=True)
@@ -322,46 +319,21 @@ class ObservableObjectType(models.Model):
     class Meta:
         ordering = ["name"]
 
-class ObservablePropertyName(models.Model):
-    type = models.ForeignKey(ObservableObjectType)
-    name = models.CharField(max_length=250)
-    alias = models.CharField(max_length=250, unique=True, blank=True, null=True)
-    class Meta:
-        unique_together = (("type", "name"),)
-        ordering = ["type", "name"]
-    def __str__(self):
-        return self.type.name + ":" + self.name
-
-class ObservableProperty(models.Model):
-    key = models.ForeignKey(ObservablePropertyName)
-    value = models.CharField(max_length=25000)
-    """
-    key = models.CharField(max_length=250)
-    class Meta:
-        unique_together = (("type", "name"),)
-        ordering = ["type", "name"]
-    """
-    def __str__(self):
-        return self.key.type.name + ":" + self.key.name + "=" + self.value
-    class Meta:
-        ordering = ["key", "value"]
-
 class ObservableObject(models.Model):
     object_id = models.CharField(max_length=250, unique=True, blank=True, null=True)
     type = models.ForeignKey(ObservableObjectType)
     description = models.TextField(blank=True, null=True)
-    """
-    property = models.ManyToManyField(ObservableProperty)
-    """
     def __str__(self):
         if self.type.model_name:
             m = apps.get_model(self._meta.app_label, self.type.model_name)
             o = m.objects.get(id=self.id)
             if hasattr(o, "name"):
-                return o.name
+                return o.type.name + ":" + o.name
             elif hasattr(o, "value"):
-                return o.value
+                return o.type.name + ":" + o.value
         return str(self.id)
+    class Meta:
+        ordering = ["type"]
 
 class DomainNameObject(ObservableObject):
     value = models.CharField(max_length=25000, unique=True)
@@ -397,16 +369,21 @@ class FileObject(ObservableObject):
     class Meta:
         ordering = ["name"]
 
+class ObservedData(STIXObject):
+    first_observed = models.DateTimeField()
+    last_observed = models.DateTimeField()
+    number_observed = models.PositiveSmallIntegerField(default=1)
+    objects = models.ManyToManyField(ObservableObject)
+    def save(self, *args, **kwargs):
+        self = _set_id(self, 'observed-data')
+        super(ObservedData, self).save(*args, **kwargs)
+
+
 class IndicatorPattern(models.Model):
     pattern = models.TextField()
     observable = models.ManyToManyField(ObservableObject)
-    """
-    property = models.ForeignKey(ObservableObjectProperty)
-    value = models.CharField(max_length=25000)
-    class Meta:
-        unique_together = (("property", "value"),)
-        ordering = ["property", "value"]
-    """
+    def __str__(self):
+        return self.pattern
 
 class Indicator(STIXObject):
     name = models.CharField(max_length=250, unique=True)
@@ -414,7 +391,7 @@ class Indicator(STIXObject):
     labels = models.ManyToManyField(IndicatorLabel)
     valid_from = models.DateTimeField(blank=True, null=True)
     valid_until = models.DateTimeField(blank=True, null=True)
-    pattern = models.ManyToManyField(IndicatorPattern)
+    pattern = models.OneToOneField(IndicatorPattern, blank=True, null=True)
     def save(self, *args, **kwargs):
         self = _set_id(self, 'indicator')
         super(Indicator, self).save(*args, **kwargs)
@@ -429,7 +406,6 @@ class CampaignAlias(models.Model):
 class Campaign(STIXObject):
     name = models.CharField(max_length=250, unique=True)
     description = models.TextField(blank=True, null=True)
-    #labels = models.ManyToManyField(IndicatorLabel)
     aliases = models.ManyToManyField(CampaignAlias, blank=True)
     first_seen = models.DateTimeField(blank=True, null=True)
     last_seen = models.DateTimeField(blank=True, null=True)
@@ -451,7 +427,6 @@ class IntrusionSetAlias(models.Model):
 class IntrusionSet(STIXObject):
     name = models.CharField(max_length=250, unique=True)
     description = models.TextField(blank=True, null=True)
-    #labels = models.ManyToManyField(IndicatorLabel)
     aliases = models.ManyToManyField(IntrusionSetAlias, blank=True)
     first_seen = models.DateTimeField(blank=True, null=True)
     last_seen = models.DateTimeField(blank=True, null=True)
@@ -462,6 +437,19 @@ class IntrusionSet(STIXObject):
         return self.name
     class Meta:
         ordering = ["name"]
+
+class Sighting(STIXObject):
+    sighting_of_ref= models.ForeignKey(STIXObjectID, related_name='sighting_of_ref')
+    where_sighted_refs = models.ManyToManyField(STIXObjectID, related_name='where_sighted_ref')
+    first_seen = models.DateTimeField()
+    last_seen = models.DateTimeField(blank=True, null=True)
+    observed_data_refs = models.ManyToManyField(ObservedData, related_name='observed_data_refs')
+    description = models.TextField(blank=True, null=True)
+    def save(self, *args, **kwargs):
+        self = _set_id(self, 'sighting')
+        super(Sighting, self).save(*args, **kwargs)
+    def __str__(self):
+        return self.object_id.object_id
 
 class TaxiiCollection(models.Model):
     collection_id = models.CharField(max_length=250, unique=True, blank=True, null=True)

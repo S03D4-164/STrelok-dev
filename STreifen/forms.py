@@ -49,6 +49,7 @@ class CampaignForm(forms.ModelForm):
         model = Campaign
         fields = [
             "name",
+            "created_by_ref",
             "aliases",
             "first_seen",
             "last_seen",
@@ -57,6 +58,9 @@ class CampaignForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(CampaignForm, self).__init__(*args, **kwargs)
         self.fields["new_alias"].required = False
+        self.fields["created_by_ref"].queryset = STIXObjectID.objects.filter(
+                object_id__startswith="identity--",
+        )
 
 class SightingForm(forms.ModelForm):
     sighting_of = forms.ModelMultipleChoiceField(
@@ -215,26 +219,29 @@ def get_related_obj(sdo):
             Q(where_sighted_refs=sdo.object_id)\
             |Q(sighting_of_ref=sdo.object_id)\
         )
+    rep = Report.objects.filter(object_refs=sdo.object_id)
+    if rep:
+        ids += rep.values_list("object_refs", flat=True)
     if rels:
-        print(rels)
+        #print(rels)
         ids += rels.values_list("object_id", flat=True)
         ids += rels.values_list("source_ref", flat=True)
         ids += rels.values_list("target_ref", flat=True)
     if sights:
-        print(sights)
+        #print(sights)
         ids += sights.values_list("object_id", flat=True)
         ids += sights.values_list("sighting_of_ref", flat=True)
         ids += sights.values_list("where_sighted_refs", flat=True)
     oids = STIXObjectID.objects.filter(
         id__in=ids
     )
-    print(oids)
+    #print(oids)
     for oid in oids:
-        print(oid)
+        #print(oid)
         obj = get_obj_from_id(oid)
         if obj:
             objects.append(obj)
-    print(objects)
+    #print(objects)
     return objects
 
 
@@ -333,7 +340,7 @@ class ReportForm(forms.ModelForm):
             "published",
             "labels",
             "description",
-            "object_refs",
+            #"object_refs",
         ]
         widgets = {
             #"labels":forms.CheckboxSelectMultiple(),
@@ -386,13 +393,6 @@ class PatternForm(forms.ModelForm):
             "pattern",
         ]
 
-class ObservablePropertyForm(forms.ModelForm):
-    class Meta:
-        model = ObservableProperty
-        fields = [
-            "key",
-            "value",
-        ]
 
 class SelectObservableForm(forms.Form):
     label = forms.ModelChoiceField(

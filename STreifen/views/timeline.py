@@ -7,6 +7,27 @@ from ..forms import *
 import json
 from dotmap import DotMap
 
+
+def timeline_view(request, id=None):
+    objs = []
+    obj = None
+    from .stix import stix_bundle
+    if id:
+        obj = STIXObject.objects.get(object_id__object_id=id)
+        objs = get_related_obj(obj)
+    else:
+        for o in  STIXObject.objects.all():
+            objs.append(get_obj_from_id(o.object_id))
+    stix = stix_bundle(objs)
+    data = stix2timeline(json.loads(str(stix)))
+    c = {
+        #"form": form,
+        "obj":obj,
+        "items": data["items"],
+        "groups": data["groups"],
+    }
+    return render(request, "timeline_viz.html", c)
+
 def find_ref(ref, stix):
     if not "objects" in stix:
         return False
@@ -17,15 +38,20 @@ def find_ref(ref, stix):
 
 def stix2timeline(stix):
     if not "objects" in stix:
-        return False
-    groups = []
+        return None
+    groups = [
+    {"id":"campaign","content":"campaign"}
+    ]
     items = []
     for obj in stix["objects"]:
         if obj["type"] == "sighting":
             sight = DotMap(obj)
             sor = sight.sighting_of_ref
             a = {}
-            if sor.split("--")[0] == "threat-actor":
+            #if sor.split("--")[0] == "threat-actor":
+            if sor.split("--")[0] in [
+                "threat-actor","malware",
+            ]:
                 actor = DotMap(find_ref(sor, stix))
                 act = {
                     "id": actor.id,
@@ -42,8 +68,9 @@ def stix2timeline(stix):
                         "content": tgt.name,
                         "group": act["id"],
                         "start": sight.first_seen,
-                        #"end": sight.last_seen,
                         "className":sight.type,
+                        "end": "",
+                        "title": "",
                     }
                     if sight.last_seen:
                         item["end"] = sight.last_seen
@@ -51,20 +78,24 @@ def stix2timeline(stix):
                         item["subgroup"] = tgt.sectors[0]
                     #if tgt.sectors.all():
                     #    item["className"] = tgt.sectors.all()[0]
+                    item["title"] = " - ".join([item["start"],item["end"]])
                     if not item in items:
                         items.append(item)
         elif obj["type"] == "report":
             report = DotMap(obj)
-            start = report.published
-            if not start:
-                start = report.created
+            start = report.created
+            if report.published:
+                start= report.published
             item = {
                 "id": report.id,
                 "content": report.name,
                 "group": None,
                 "className": report.type,
-                "start": start
+                "start": start,
+                "end":"",
+                "title":"",
             }
+            item["title"] = " - ".join([item["start"],item["end"]])
             for ref in report.object_refs:
                 if ref.split("--")[0] == "threat-actor":
                     actor = DotMap(find_ref(ref, stix))
@@ -78,6 +109,23 @@ def stix2timeline(stix):
                         item["group"] = a["id"]
             if not item in items:
                 items.append(item)
+        elif obj["type"] == "campaign":
+            campaign = DotMap(obj)
+            if campaign.first_seen:
+                item = {
+                    "id": campaign.id,
+                    "content": campaign.name,
+                    "group": "campaign",
+                    "className": "",
+                    "start": campaign.first_seen,
+                    "end":"",
+                    "title":"",
+                }
+                if campaign.last_seen:
+                    item["end"] = campaign.last_seen
+                if not item in items:
+                    items.append(item)
+        #elif obj["type"] == "indicator":
     dataset = {
         "items":items,
         "groups":groups,
@@ -166,13 +214,10 @@ def data_timeline(request=None, model=None, field=None):
     return JsonResponse(dataset)
 
 def viz_timeline(request, model=None, field=None):
-    #if request.method == "POST":
-    #    print(request.POST)
     data = data_timeline(model=model, field=field)
-    form = TimelineForm()
-    #print(form)
+    #form = TimelineForm()
     c = {
-        "form": form,
+        #"form": form,
         "items": data["items"],
         "groups": data["groups"],
     }

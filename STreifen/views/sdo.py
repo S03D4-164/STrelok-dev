@@ -3,8 +3,8 @@ from django.http import HttpResponse, JsonResponse
 from django.contrib import messages
 from django.apps import apps
 
-import STreifen.models as mymodels
-import STreifen.forms as myforms
+#import STreifen.models as mymodels
+#import STreifen.forms as myforms
 from ..models import *
 from ..forms import *
 from .stix import stix_bundle
@@ -13,7 +13,7 @@ from .chart import *
 import json
 import stix2
 
-def get_related_obj(sdo):
+def _get_related_obj(sdo):
     objects = []
     ids = [sdo.object_id.id]
     rels = None
@@ -115,13 +115,13 @@ def sdo_list(request, type):
                         for line in observable.split("\n"):
                             if line:
                                 type = line.strip().split(":")[0]
-                                value = ":".join(line.strip().split(":")[1:])
+                                value = ":".join(line.strip().split(":")[1:]).strip()
                                 t = ObservableObjectType.objects.filter(name=type)
                                 if t.count() == 1:
                                     t = t[0]
-                                    print(t)
+                                    #print(t)
                                     if t.model_name:
-                                        print(t.model_name)
+                                        #print(t.model_name)
                                         m = apps.get_model(t._meta.app_label, t.model_name)
                                         o = None
                                         if t.name == "file":
@@ -138,15 +138,13 @@ def sdo_list(request, type):
                                             obs.append(o)
                                             pattern.append(type +"="+ value)
                         if pattern:
-                            p, cre = IndicatorPattern.objects.get_or_create(
+                            p = IndicatorPattern.objects.create(
                                 pattern = " OR ".join(sorted(pattern))
                             )
-                            if cre:
-                                p.observable.add(*obs)
-                                p.save()
-                            if p:
-                                s.pattern.add(p)
-                                s.save()
+                            p.observable.add(*obs)
+                            p.save()
+                            s.pattern = p
+                            s.save()
                 messages.add_message(
                     request, messages.SUCCESS, 'Created -> '+s.name,
                 )
@@ -240,7 +238,7 @@ def sdo_list(request, type):
         c["sform"] = SelectObservableForm()
     return render(request, 'base_list.html', c)
 
-def getform(type, request=None, instance=None, report=False):
+def getform(type, request=None, instance=None, report=None):
     post = None
     if request:
         if request.method == 'POST':
@@ -262,7 +260,8 @@ def getform(type, request=None, instance=None, report=False):
     elif type == "relationship":
         form = RelationshipForm(post,instance=instance)
         if report:
-            choices = myforms.object_choices(
+            # exclude SRO
+            choices = object_choices(
                 ids=report.object_refs.all().exclude(
                     object_id__startswith = 'relationship'
                 ).exclude(
@@ -275,7 +274,7 @@ def getform(type, request=None, instance=None, report=False):
     elif type == "sighting":
         form = SightingForm(post,instance=instance)
         if report:
-            wsr = myforms.object_choices(
+            wsr = object_choices(
                 ids=report.object_refs.filter(
                     object_id__startswith="identity"
                 )
@@ -290,7 +289,7 @@ def getform(type, request=None, instance=None, report=False):
             )
             form.fields["sighting_of_ref"].choices = sor
         return form
-    return False
+    return None
 
 def add_object_refs(report, oid):
     report.object_refs.add(oid)
@@ -329,45 +328,35 @@ def sdo_view(request, id):
             sights.append(o)
         else:
             objects.append(o)
-    """
-    rels, objects = get_related_obj(sdo)
-    if sdo.object_type.name == "report":
-        rels = Relationship.objects.filter(object_id__in=sdo.object_refs.all())
-        for r in sdo.object_refs.all():
-            o = get_obj_from_id(r)
-            if not o.object_type.name == "relationship":
-                if not o in objects:
-                    objects.append(o)
-    """
 
     soform = SelectObjectForm()
     selected = None
     coform = None
 
     aoform = AddObjectForm()
-    # Get defined relationship from source
-    drs = DefinedRelationship.objects.filter(
-        source=sdo.object_type
-    )
-    aoform.fields["relation"].queryset = RelationshipType.objects.filter(
-      id__in=drs.values("type")
-    )
-    #tgt = STIXObject.objects.filter(object_type__in=drs.values("target"))
-    if not sdo.object_type.name == "report":
-      aoform.fields["objects"].choices = object_choices(
-        #ids=STIXObjectID.objects.filter(id__in=tgt)
-        ids=[]
-      )
-      aoform.fields["relation"].required = True
-    elif sdo.object_type.name == "report":
-      aoform.fields["objects"].choices = object_choices(
-        ids=STIXObjectID.objects.all()
-      )
     if sdo.object_type.name == "identity":
         aoform = SightingForm()
+    elif not sdo.object_type.name == "report":
+        # Get defined relationship from source
+        drs = DefinedRelationship.objects.filter(
+            source=sdo.object_type
+        )
+        aoform.fields["relation"].queryset = RelationshipType.objects.filter(
+          id__in=drs.values("type")
+        )
+        #tgt = STIXObject.objects.filter(object_type__in=drs.values("target"))
+        aoform.fields["objects"].choices = object_choices(
+            #ids=STIXObjectID.objects.filter(id__in=tgt)
+            ids=[]
+        )
+        aoform.fields["relation"].required = True
+    #elif sdo.object_type.name == "report":
+    #    aoform.fields["objects"].choices = object_choices(
+    #        ids=STIXObjectID.objects.all()
+    #    )
 
     if request.method == "POST":
-        #print(request.POST)
+        print(request.POST)
         if 'update' in request.POST:
             form = getform(id.split("--")[0],request=request,instance=sdo)
             if form.is_valid():
@@ -376,7 +365,7 @@ def sdo_view(request, id):
                     n = form.cleaned_data["new_alias"]
                     if n:
                         ta, cre = ThreatActorAlias.objects.get_or_create(
-                            name = n
+                            name=n
                         )
                         s.aliases.add(ta)
                         s.save()
@@ -384,42 +373,50 @@ def sdo_view(request, id):
                     l = form.cleaned_data["new_label"]
                     if l:
                         il, cre = IdentityLabel.objects.get_or_create(
-                            value = l
+                            value=l
                         )
                         s.labels.add(il)
                         s.save()
                 elif s.object_type.name == "campaign":
                     n = form.cleaned_data["new_alias"]
                     if n:
-                        ta, cre = CampaignAlias.objects.get_or_create(
-                            name = n
+                        ca, cre = CampaignAlias.objects.get_or_create(
+                            name=n
                         )
-                        s.aliases.add(ta)
+                        s.aliases.add(ca)
                         s.save()
-                messages.add_message(
-                    request, messages.SUCCESS, 'Updated.'
-                )
+                messages.add_message(request, messages.SUCCESS, 'Updated.')
                 return redirect("/stix/"+id)
         elif 'detach[]' in request.POST:
             dlist = request.POST.getlist("detach[]")
-            for i in STIXObjectID.objects.filter(
-                object_id__in=dlist
-            ):
-                d = get_obj_from_id(i)
-                d.delete()
-            messages.add_message(
-                request, messages.SUCCESS, 'Removed.'
-            )
-            #return redirect("/stix/"+id)
+            if sdo.object_type.name == "report":
+                rm = STIXObjectID.objects.filter(object_id__in=dlist)
+                rmr = Relationship.objects.filter(
+                    object_id__in=sdo.object_refs.all()
+                ).filter(
+                    Q(source_ref__in=rm)|Q(target_ref__in=rm)
+                ).values_list("object_id", flat=True)
+                rms = Sighting.objects.filter(
+                    object_id__in=sdo.object_refs.all()
+                ).filter(
+                    Q(sighting_of_ref__in=rm)|Q(where_sighted_refs__in=rm)
+                ).values_list("object_id", flat=True)
+                sdo.object_refs.remove(*rm, *rmr, *rms)
+                sdo.save()
+            else:
+                for i in STIXObjectID.objects.filter(object_id__in=dlist):
+                    d = get_obj_from_id(i)
+                    d.delete()
+            messages.add_message(request, messages.SUCCESS, 'Removed.')
+            return redirect("/stix/"+id)
         elif 'detach_ref' in request.POST:
             rform = ReportRefForm(request.POST, instance=report)
-            #print(rform)
+            """
             if rform.is_valid():
                 rform.save()
-                messages.add_message(
-                    request, messages.SUCCESS, 'Updated.'
-                )
+                messages.add_message(request, messages.SUCCESS, 'Updated.')
                 return redirect("/stix/"+id)
+            """
         elif 'delete' in request.POST:
             name = sdo.name
             sdo.delete()
@@ -445,7 +442,6 @@ def sdo_view(request, id):
                         bulk_create_indicator(label,property,input,src=sdo)
         elif 'select' in request.POST:
             sotid = request.POST.get('select')
-            #print(sotid)
             if sotid:
                 sot = STIXObjectType.objects.get(id=sotid)
                 selected = sot.name
@@ -453,10 +449,11 @@ def sdo_view(request, id):
                 #coform = _object_form(selected, report=report)
                 coform = getform(selected)
                 aoform.fields["objects"].choices = object_choices(
-                    ids=STIXObjectID.objects.filter(
-                        object_id__startswith=selected.split("--")[0]
-                    )
+                    ids=STIXObjectID.objects.filter(object_id__startswith=selected.split("--")[0])
                 )
+                #aoform.fields["objects"].queryset = STIXObjectID.objects.filter(
+                #    object_id__startswith=selected.split("--")[0]
+                #)
         elif 'select_rel' in request.POST:
             rt = request.POST.get('select_rel')
             if rt:
@@ -516,6 +513,17 @@ def sdo_view(request, id):
                 for ref in refs:
                     if sdo.object_type.name == "report":
                         sdo.object_refs.add(ref)
+                        r = Relationship.objects.filter(object_id=ref)
+                        if r.count() == 1:
+                            sdo.object_refs.add(r[0].source_ref, r[0].target_ref)
+                        s = Sighting.objects.filter(object_id=ref)
+                        if s.count() == 1:
+                            sdo.object_refs.add(
+                                s[0].sighting_of_ref,
+                                *s[0].where_sighted_refs
+                        )
+                        sdo.save()
+                            
                     else:
                         Relationship.objects.get_or_create(
                             source_ref=sdo.object_id,
@@ -542,7 +550,7 @@ def sdo_view(request, id):
         "sights": sights,
         "stix":stix,
     }
-    if selected == "indicator":
-        c["obform"] = ObservablePropertyForm()
+    #if selected == "indicator":
+    #    c["obform"] = ObservablePropertyForm()
     return render(request, 'base_view.html', c)
     #return render(request, 'report_view.html', c)

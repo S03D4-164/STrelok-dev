@@ -11,8 +11,8 @@
 {% block container %}
 
 <div class="col-md-12">
-<div class="panel panel-primary">
-<div class="panel-heading">Timeline</div>
+<div class="panel panel-default">
+<div class="panel-heading">Timeline{% if obj %} of <a href="/stix/{{obj.object_id.object_id}}">{{obj}}</a>{% endif %}</div>
 <div class="panel-body">
 
 <div class="col-md-10" id="visualization" ></div>
@@ -49,6 +49,7 @@
 </div>
 
 <script type="text/javascript">
+{% if groups %}
 var groups = new vis.DataSet();
 groups.add([{% for g in groups %}
 {
@@ -56,12 +57,14 @@ groups.add([{% for g in groups %}
     content: "{{g.content}}",
 },
 {% endfor %}]);
+{% endif %}
 
 var items = new vis.DataSet();
 items.add([{% for i in items %}
 {
     id: "{{i.id}}",
     content: "{{i.content}}",
+    title: "{{i.title}}",
     group: "{{i.group}}",
     subgroup: "{{i.subgroup}}",
     className: "{{i.className}}",
@@ -76,7 +79,11 @@ var options = {
     orientation: 'top',
     //horizontalScroll:true,
 };
+{% if groups %}
 var timeline = new vis.Timeline(container, items, groups, options);
+{% else %}
+var timeline = new vis.Timeline(container, items, options);
+{% endif %}
 </script>
 </div>
 {% endblock%}
