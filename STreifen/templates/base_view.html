@@ -34,17 +34,27 @@ $(document).ready(
     function(){
         $("select#id_relation").change(function(){
             var parent = $(this).parent();
+            console.log(parent);
+            var data = {
+                csrfmiddlewaretoken:'{{csrf_token}}',
+            };
+            if (parent.is("div#select_rel")){
+                data["select_rel"] = $(this).val();
+            } else if (parent.is("div#select_dr")){
+                data["select_dr"] = $(this).val();
+            };
             $.ajax({
                 type: 'POST',
-                data: {
-                    select_rel:$(this).val(),
-                    csrfmiddlewaretoken:'{{csrf_token}}',
-                },
+                //data: {select_rel:$(this).val(),csrfmiddlewaretoken:'{{csrf_token}}'},
+                data: data,
                 success: function(result){
                     //console.log(parent);
                     if (parent.is("div#select_rel")){
                         rform = $(result).find("#add_obj");
                         $("#add_obj").replaceWith(rform);
+                    }else if (parent.is("div#select_dr")){
+                        cform = $(result).find("#create_object");
+                        $("#create_object").replaceWith(cform);
                     };
                 }
             });
@@ -177,8 +187,12 @@ $(document).ready(
 <h4 class="modal-title">Create Object</h4>
 </div>
 <div class="modal-body">
-<form method="post">{% csrf_token %}
-<div id="select_create">Select:{{soform.type}}</div>
+<form class="create_form" method="post">{% csrf_token %}
+{% if obj.object_type.name == "report" %}
+<div id="select_create">{{soform}}</div>
+{% else %}
+<div id="select_dr">{{drform}}</div>
+{% endif %}
 <br>
 <div id="create_object" >
 {% if coform %}
@@ -267,7 +281,7 @@ $(document).ready(
 <div class="panel-body">
 
 <table class="table table-condensed">
-<tr><th class="col-md-2">Name</th><td>{{obj.name}}</td></tr>
+<tr><th class="col-md-3">Name</th><td>{{obj.name}}</td></tr>
 {% block property %}
 {% if obj.object_type.name != "campaign"%}
 <tr><th >Labels</th>
@@ -335,13 +349,11 @@ STIX
 <div class="panel panel-primary">
 <div class="panel-body">
 <a class="btn btn-primary btn-xs" data-toggle="modal" href="#add_form">Add</a>
-<!--<a class="btn btn-warning btn-xs" data-toggle="modal" href="#detach_form">Detach</a>-->
-<a class="btn btn-warning btn-xs" onclick=detachObject()>Detach</a>
-{% if obj.object_type.name == "report" %}
+{% if obj.object_type.name != "identity" %}
 <a class="btn btn-info btn-xs" data-toggle="modal" href="#create_form">Create</a>
 <a class="btn btn-info btn-xs" data-toggle="modal" href="#bulk_form">Bulk Create</a>
 {% endif %}
-
+<a class="btn btn-warning btn-xs" onclick=detachObject()>Detach</a>
 
 <div class="tab-content">
 

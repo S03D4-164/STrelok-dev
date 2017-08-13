@@ -49,7 +49,7 @@ $(document).ready(
 {% block container %}
 
 <div class="col-md-12">
-<div class="panel panel-primary">
+<div class="panel panel-default">
 <div class="panel-heading">STIX Defined Relationships</div>
 <div class="panel-body">
 
@@ -57,11 +57,11 @@ $(document).ready(
 
 <div class="col-md-5" >
 <form method=post>{% csrf_token %}
-<div class="col-md-7" id="types_form">
+<div class="col-md-6" id="types_form">
 <input type="checkbox" id="select_types" checked>types</input>
 {{tsform.types}}
 </div>
-<div class="col-md-5" id="rel_form">
+<div class="col-md-6" id="rel_form">
 <input type="checkbox" id="select_relation" checked>relationship</input>
 {{tsform.relation}}
 </div>

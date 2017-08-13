@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.DEBUG)
 class InputForm(forms.Form):
     input = forms.CharField(
         widget=forms.Textarea(
-            attrs={'style':'height:300px;'}
+            attrs={'style':'height:200px;'}
         )
     )
 
@@ -138,6 +138,24 @@ class MalwareForm(forms.ModelForm):
             "description",
         ]
 
+class ToolForm(forms.ModelForm):
+    class Meta:
+        model = Tool
+        fields = [
+            "name",
+            "labels",
+            "description",
+        ]
+
+class VulnerabilityForm(forms.ModelForm):
+    class Meta:
+        model = Vulnerability
+        fields = [
+            "name",
+            "description",
+        ]
+
+
 class AttackPatternForm(forms.ModelForm):
     class Meta:
         model = AttackPattern
@@ -179,20 +197,7 @@ class DefinedRelationshipForm(forms.Form):
 
 class SelectObjectForm(forms.Form):
     type = forms.ModelChoiceField(
-        queryset=STIXObjectType.objects.filter(
-            name__in=[
-                "identity",
-                "attack-pattern",
-                "malware",
-                "campaign",
-                "tool",
-                "vulnerability",
-                "threat-actor",
-                "relationship",
-                "sighting",
-                "indicator",
-            ]
-        ),
+        queryset=STIXObjectType.objects.filter()
     )
     def __init__(self, *args, **kwargs):
         super(SelectObjectForm, self).__init__(*args, **kwargs)
@@ -244,20 +249,6 @@ def get_related_obj(sdo):
     #print(objects)
     return objects
 
-
-def _get_obj_from_id(soi):
-    sot = soi.object_id.split('--')[0]
-    m = ""
-    for s in sot.split('-'):
-        m += s.capitalize()
-    obj = getattr(mymodels, m).objects.filter(object_id=soi)
-    if obj.count() == 1:
-        return obj.all()[0]
-    else:
-        logging.error("Object not found: "+soi.object_id)
-        if soi.id:
-            soi.delete()
-    return None
 
 def object_choices(
         #ids=STIXObjectID.objects.all(),
