@@ -91,7 +91,6 @@ def cnt_actor_by_tgt_label(label, relation):
     )
     return dd
 
-
 def stats_ati():
     dataset = []
     # all actor-targets-identity
@@ -169,3 +168,30 @@ def stats_ati():
     dataset = json.dumps(dataset,indent=2)
     return dataset
 
+def cnt_tgt_by_label():
+    dataset = []
+    sights = Sighting.objects.filter(
+        where_sighted_refs__object_id__startswith="identity--",
+        sighting_of_ref__object_id__startswith="threat-actor--",
+    )
+    tgt = Identity.objects.filter(
+        id__in=sights.values_list("where_sighted_refs",flat=True)
+    )
+    for l in IdentityLabel.objects.all():
+        cnt = tgt.filter(labels=l).count()
+        item = {
+            "name": l.value,
+            "y": cnt,
+            "drilldown":{"data": []},
+        }
+        if item["y"]:
+            if not item in dataset:
+                dataset.append(item)
+
+    dataset = sorted(
+            dataset,
+            key=lambda kv: kv["y"],
+            reverse=True
+    )
+    dataset = json.dumps(dataset,indent=2)
+    return dataset

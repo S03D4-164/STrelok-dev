@@ -191,6 +191,7 @@ def sdo_list(request, type):
     elif type == "identity":
         c["bulkformat"] = "name,(label,description)"
         c["sform"] = IdentityClassForm()
+        c["data"] = cnt_tgt_by_label()
     elif type == "indicator":
         c["sform"] = SelectObservableForm()
     return render(request, 'base_list.html', c)
@@ -278,6 +279,7 @@ def sdo_view(request, id):
     form = getform(id.split("--")[0], instance=sdo)
 
     objs = get_related_obj(sdo)
+    #print(objs)
     stix = stix_bundle(objs)
     rels = []
     sights = []
@@ -470,7 +472,8 @@ def sdo_view(request, id):
         elif 'add_sight' in request.POST:
             aoform = SightingForm(request.POST)
             if aoform.is_valid():
-                refs = aoform.cleaned_data["sighting_of"]
+                ref = aoform.cleaned_data["sighting_of"]
+                refs = aoform.cleaned_data["sighting_of_refs"]
                 first_seen = aoform.cleaned_data["first_seen"]
                 last_seen = aoform.cleaned_data["last_seen"]
                 description = aoform.cleaned_data["description"]

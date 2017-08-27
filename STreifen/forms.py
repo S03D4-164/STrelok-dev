@@ -17,21 +17,25 @@ class InputForm(forms.Form):
     )
 
 class TimelineForm(forms.Form):
-    models = [
-        "report",
-        "sighting",
-        #"campaign",
-        #"attack-pattern",
-    ]
-    objects = forms.ModelMultipleChoiceField(
+    type = forms.ChoiceField(choices=(
+        ("point","point"),
+        ("box","box"),
+        ("","default")
+    ),initial="point")
+    group = forms.ModelMultipleChoiceField(
         queryset=STIXObjectType.objects.filter(
-            name__in=models
+            name__in=[
+                "attack-pattern",
+                "campaign",
+                "malware",
+                "threat-actor",
+            ]
         ),
         widget=forms.CheckboxSelectMultiple(attrs={"checked":""})
     )
     def __init__(self, *args, **kwargs):
         super(TimelineForm, self).__init__(*args, **kwargs)
-        self.fields["objects"].required = False
+        self.fields["group"].required = False
 
 class RelationshipForm(forms.ModelForm):
     class Meta:
@@ -69,7 +73,8 @@ class SightingForm(forms.ModelForm):
     class Meta:
         model = Sighting
         fields = [
-            #"where_sighted_refs",
+            "where_sighted_refs",
+            "sighting_of_ref",
             "sighting_of",
             "first_seen",
             "last_seen",
@@ -77,7 +82,7 @@ class SightingForm(forms.ModelForm):
         ]
     def __init__(self, *args, **kwargs):
         super(SightingForm, self).__init__(*args, **kwargs)
-        self.fields["sighting_of"].choices = object_choices(
+        schoices = object_choices(
             ids = STIXObjectID.objects.filter(
                 Q(object_id__startswith="threat-actor--")\
                 |Q(object_id__startswith="malware--")\
@@ -87,14 +92,14 @@ class SightingForm(forms.ModelForm):
                 |Q(object_id__startswith="tool--")\
             )
         )
-        """
+        self.fields["sighting_of_ref"].choices = schoices
+        self.fields["sighting_of"].choices = schoices
         self.fields["where_sighted_refs"].choices = object_choices(
             ids=STIXObjectID.objects.filter(
                 object_id__startswith="identity--",
             ),
-            dummy=True
         )
-        """
+        self.fields["where_sighted_refs"].required = False
 
 class ThreatActorLabelForm(forms.ModelForm):
     #new_label = forms.CharField()
@@ -214,7 +219,10 @@ def get_related_obj(sdo):
         ids += sdo.object_refs.all().values_list("id",flat=True)
         rels = Relationship.objects.filter(id__in=sdo.object_refs.all())
         sights = Sighting.objects.filter(id__in=sdo.object_refs.all())
-
+    elif sdo.object_type.name == "sighting":
+        sights = Sighting.objects.filter(object_id__id__in=ids)
+    elif sdo.object_type.name == "relationship":
+        rels = Relationship.objects.filter(object_id_id__in=ids)
     else:
         rels = Relationship.objects.filter(
             Q(source_ref=sdo.object_id)\
@@ -240,7 +248,6 @@ def get_related_obj(sdo):
     oids = STIXObjectID.objects.filter(
         id__in=ids
     )
-    #print(oids)
     for oid in oids:
         #print(oid)
         obj = get_obj_from_id(oid)

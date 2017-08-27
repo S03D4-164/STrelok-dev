@@ -4,9 +4,8 @@ from django.db.models import Q
 
 from ..models import *
 from ..forms import *
-import json
+import json, hashlib
 from dotmap import DotMap
-
 
 def timeline_view(request, id=None):
     objs = []
@@ -21,10 +20,12 @@ def timeline_view(request, id=None):
     stix = stix_bundle(objs)
     data = stix2timeline(json.loads(str(stix)))
     c = {
-        #"form": form,
+        "form": TimelineForm(),
         "obj":obj,
         "items": data["items"],
         "groups": data["groups"],
+        "subgroups": data["subgroups"],
+        "color": data["color"],
     }
     return render(request, "timeline_viz.html", c)
 
@@ -39,48 +40,67 @@ def find_ref(ref, stix):
 def stix2timeline(stix):
     if not "objects" in stix:
         return None
-    groups = [
-    {"id":"campaign","content":"campaign"}
-    ]
+    #groups = [
+    #{"id":"campaign","content":"campaign"}
+    #]
+    groups = {}
+    subgroups = []
     items = []
+    color = {}
     for obj in stix["objects"]:
+        #print(obj)
         if obj["type"] == "sighting":
-            sight = DotMap(obj)
-            sor = sight.sighting_of_ref
-            a = {}
-            #if sor.split("--")[0] == "threat-actor":
+            sighting = DotMap(obj)
+            sor = sighting.sighting_of_ref
             if sor.split("--")[0] in [
-                "threat-actor","malware",
+                "threat-actor", "malware","attack-pattern"
             ]:
-                actor = DotMap(find_ref(sor, stix))
-                act = {
-                    "id": actor.id,
-                    "content": actor.name,
-                }
-                if not act in groups:
-                    groups.append(act)
-            wsr = sight.where_sighted_refs
-            for w in wsr:
-                if w.split("--")[0] == "identity":
-                    tgt = DotMap(find_ref(w, stix))
-                    item = {
-                        "id": sight.id,
-                        "content": tgt.name,
-                        "group": act["id"],
-                        "start": sight.first_seen,
-                        "className":sight.type,
-                        "end": "",
-                        "title": "",
+                so = find_ref(sor, stix)
+                if so:
+                    so = DotMap(so)
+                    sighted = {
+                        "id": so.id,
+                        "content": so.name,
+                        "group": so.type
                     }
-                    if sight.last_seen:
-                        item["end"] = sight.last_seen
-                    if tgt.sectors:
-                        item["subgroup"] = tgt.sectors[0]
-                    #if tgt.sectors.all():
-                    #    item["className"] = tgt.sectors.all()[0]
-                    item["title"] = " - ".join([item["start"],item["end"]])
-                    if not item in items:
-                        items.append(item)
+                    if not sighted in subgroups:
+                        subgroups.append(sighted)
+                    category = {
+                        "id": sighted["group"],
+                        "content": sighted["group"],
+                        "nested_groups":[]
+                    }
+                    if not sighted["group"] in groups:
+                        groups[sighted["group"]] = category
+                    if not sighted["id"] in groups[sighted["group"]]["nested_groups"]:
+                        groups[sighted["group"]]["nested_groups"].append(sighted["id"])
+                    wsr = sighting.where_sighted_refs
+                    for w in wsr:
+                        if w.split("--")[0] == "identity":
+                            tgt = find_ref(w, stix)
+                            if tgt:
+                                tgt = DotMap(tgt)
+                                item = {
+                                    "id": sighting.id,
+                                    "content": tgt.name,
+                                    "group": sighted["id"],
+                                    "start": sighting.first_seen,
+                                    "className":sighting.type,
+                                    "end": "",
+                                    "title": "",
+                                }
+                                if sighting.last_seen:
+                                    item["end"] = sighting.last_seen
+                                if tgt.sectors:
+                                    item["subgroup"] = tgt.sectors[0]
+                                #if tgt.sectors.all():
+                                #    item["className"] = tgt.sectors.all()[0]
+                                item["title"] = " - ".join([item["start"],item["end"]])
+                                if not item in items:
+                                    items.append(item)
+                                    if not item["className"] in color:
+                                        color[item["className"]] = "#" + \
+                                            hashlib.md5(item["className"].encode("utf8")).hexdigest()[0:6]
         elif obj["type"] == "report":
             report = DotMap(obj)
             start = report.created
@@ -98,17 +118,32 @@ def stix2timeline(stix):
             item["title"] = " - ".join([item["start"],item["end"]])
             for ref in report.object_refs:
                 if ref.split("--")[0] == "threat-actor":
-                    actor = DotMap(find_ref(ref, stix))
-                    a = {
-                        "id": actor.id,
-                        "content": actor.name,
-                    }
-                    if not a in groups:
-                        groups.append(a)
-                    if not item["group"]:
-                        item["group"] = a["id"]
+                    actor = find_ref(ref, stix)
+                    if actor:
+                        actor = DotMap(actor)
+                        a = {
+                            "id": actor.id,
+                            "content": actor.name,
+                            "group":actor.type,
+                        }
+                        if not a in subgroups:
+                            subgroups.append(a)
+                        category = {
+                            "id": a["group"],
+                            "content": a["group"],
+                            "nested_groups":[]
+                        }
+                        if not a["group"] in groups:
+                            groups[a["group"]] = category
+                        if not a["id"] in groups[a["group"]]["nested_groups"]:
+                            groups[a["group"]]["nested_groups"].append(a["id"])
+                        if not item["group"]:
+                            item["group"] = a["id"]
             if not item in items:
                 items.append(item)
+                if not item["className"] in color:
+                    color[item["className"]] = "#" + \
+                        hashlib.md5(item["className"].encode("utf8")).hexdigest()[0:6]
         elif obj["type"] == "campaign":
             campaign = DotMap(obj)
             if campaign.first_seen:
@@ -116,7 +151,6 @@ def stix2timeline(stix):
                     "id": campaign.id,
                     "content": campaign.name,
                     "group": "campaign",
-                    "className": "",
                     "start": campaign.first_seen,
                     "end":"",
                     "title":"",
@@ -125,10 +159,20 @@ def stix2timeline(stix):
                     item["end"] = campaign.last_seen
                 if not item in items:
                     items.append(item)
+                    if not item["group"] in groups:
+                        groups[item["group"]] = {
+                            "id":"campaign",
+                            "content":"campaign",
+                        }
         #elif obj["type"] == "indicator":
+    g = []
+    for k,v in groups.items():
+        g.append(v)
     dataset = {
         "items":items,
-        "groups":groups,
+        "groups":g,
+        "subgroups":subgroups,
+        "color":color,
     }
     return dataset
 

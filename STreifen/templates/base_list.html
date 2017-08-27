@@ -6,11 +6,12 @@
 
 {% block visjslib %}{% endblock %}
 {% block jquery %}
-{% if type == "threat-actor" %}
+{% if type == "threat-actor" or type == "identity" %}
 <script type="text/javascript" src="/static/highcharts/highcharts.js"></script>
 <script type="text/javascript" src="/static/highcharts/modules/data.js"></script>
 <script type="text/javascript" src="/static/highcharts/modules/drilldown.js"></script>
 <script src="/static/js/chart_ati.js"></script>
+<script src="/static/js/chart_tgt.js"></script>
 {% endif %}
 <script>
 $(document).ready(
@@ -37,6 +38,8 @@ $(document).ready(
         $('#id_valid_until').datetimepicker({format:'Y-m-d H:i'});
         {% if type == "threat-actor" %}
         actorChart({{data|safe}});
+        {% elif type == "identity" %}
+        tgtChart({{data|safe}});
         {% endif %}
     }
 );
@@ -89,7 +92,7 @@ $(document).ready(
 {% block top_pane %}{% endblock %}
 
 {% block left_pane %}
-{% if type == "threat-actor" or type == "indicator" %}
+{% if type == "threat-actor" or type == "identity" or type == "indicator" %}
 <div id="left_pane" class="col-md-6">
 {% else %}
 <div id="left_pane" class="col-md-12">
@@ -110,7 +113,6 @@ $(document).ready(
 <th class="col-md-2">Published</th>
 {% elif type == "identity" %}
 <th class="col-md-3">Sector</th>
-<th class="col-md-3">Labels</th>
 {% elif type == "malware" %}
 <th class="col-md-3">Labels</th>
 <!--<th class="col-md-3">Description</th>-->
@@ -141,7 +143,7 @@ $(document).ready(
 </tr></thead>
 </table>
 </div><!--/#left_pane-->
-{% elif type == "threat-actor" %}
+{% elif type == "threat-actor" or type == "identity" %}
 <div id="left_pane" class="col-md-6">
 <div class="panel panel-default">
 

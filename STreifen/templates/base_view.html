@@ -261,16 +261,17 @@ $(document).ready(
 
 <div id="obj_panel" class="panel panel-default">
 <div class="panel-heading">
+<a data-toggle="collapse" href="#obj_body" >
+{{obj.object_type.name|capfirst}}▼</a>
+<a class="btn btn-warning btn-xs" data-toggle="modal" href="#obj_form">Edit</a>
+<a class="btn btn-danger btn-xs" data-toggle="modal" href="#delete_form">Delete</a>
+<br>
 <h4>
 <a href="">
 {% if obj.name %}{{obj.name}}
-{% else %}{obj.object_id.object_id}}
+{% else %}{{obj.object_id.object_id}}
 {% endif %}
 </a>
-<a data-toggle="collapse" href="#obj_body" >▼</a>
-<br>
-<a class="btn btn-warning btn-xs" data-toggle="modal" href="#obj_form">Edit</a>
-<a class="btn btn-danger btn-xs" data-toggle="modal" href="#delete_form">Delete</a>
 <br>
 </h4>
 </div><!--.panel-heading-->
@@ -281,16 +282,15 @@ $(document).ready(
 <div class="panel-body">
 
 <table class="table table-condensed">
-<tr><th class="col-md-3">Name</th><td>{{obj.name}}</td></tr>
 {% block property %}
-{% if obj.object_type.name != "campaign"%}
+<tr><th class="col-md-3">Created</th><td>{{obj.created}}</td></tr>
+<tr><th >Modified</th><td>{{obj.modified}}</td></tr>
 <tr><th >Labels</th>
 <td>
 {% for l in obj.labels.all %}
 {{l.value}}<br>
 {% endfor %}
 </td></tr>
-{% endif %}
 {% if obj.object_type.name == "report"%}
 <tr><th >Publisher</th><td>{{obj.created_by_ref}}</td></tr>
 <tr><th >Published</th><td>{{obj.published}}</td></tr>
@@ -299,8 +299,6 @@ $(document).ready(
 {% elif obj.object_type.name == "threat-actor" or obj.object_type.name == "campaign" %}
 <tr><th >Alias</th><td>{% for a in obj.aliases.all %}{{a}}<br>{% endfor%}</td></tr>
 {% endif %}
-<tr><th >Created</th><td>{{obj.created}}</td></tr>
-<tr><th >Modified</th><td>{{obj.modified}}</td></tr>
 {% endblock %}
 
 <tr>
@@ -383,12 +381,15 @@ STIX
 <th class="col-sm-1"> </th>
 <th class="col-sm-3">Where Sighted</th>
 <th class="col-sm-3">Sighting of</th>
-<th class="col-sm-5">First/Last Seen</th>
+<th data-sort-default class="col-sm-5">First/Last Seen</th>
 </tr></thead>
 <tbody id="sight_tbody">
 {% for s in sights %}
 <tr>
-<td><input class="object_id" type="checkbox" value="{{s.object_id}}"></td>
+<td>
+<a class="btn btn-default btn-xs" href="/stix/{{s.object_id.object_id}}">></a>
+<input class="object_id" type="checkbox" value="{{s.object_id.object_id}}">
+</td>
 <td>
 <!--<td><a class="btn btn-primary btn-xs">{{s.id}}</a></td>-->
 {% for r in s.where_sighted_refs.all %}
@@ -424,14 +425,17 @@ STIX
 <thead><tr>
 <th class="col-sm-1"> </th>
 <th class="col-sm-3">Source</th>
-<th class="col-sm-2">Type</th>
+<th data-sort-default class="col-sm-2">Type</th>
 <th class="col-sm-3">Target</th>
 <th class="col-sm-3">Description</th>
 </tr></thead>
 <tbody id="rel_tbody">
 {% for r in rels %}
 <tr>
-<td><input class="object_id" type="checkbox" value="{{r.object_id}}"></td>
+<td>
+<a class="btn btn-default btn-xs" href="/stix/{{r.object_id.object_id}}">></a>
+<input class="object_id" type="checkbox" value="{{r.object_id.object_id}}">
+</td>
 <td>
 {% for s in objects %}
 {% if s.object_id == r.source_ref %}
@@ -472,15 +476,15 @@ STIX
 </form>
 </th>
 -->
+<th data-sort-default class="col-sm-4">Type</th>
 <th class="col-sm-4">Name</th>
-<th class="col-sm-4">Type</th>
 <th class="col-sm-4">Label</th>
 </tr></thead>
 <tbody >
 {% for o in objects %}
 <tr>
-<td><a href="/stix/{{o.object_id.object_id}}">{{o.name}}</a></td>
 <td>{{o.object_type.name}}</td>
+<td><a href="/stix/{{o.object_id.object_id}}">{{o.name}}</a></td>
 <td>{% for l in o.labels.all %}{{l}}<br>{% endfor %}</td>
 <!--<td>{{o.object_id.object_id}}</td>-->
 </tr>
