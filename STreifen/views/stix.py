@@ -358,6 +358,7 @@ def stix_bundle(objs):
 
 def stix_view(request):
     form = InputForm()
+    tform = TypeSelectForm()
     if request.method == "POST":
         #print(request.POST)
         if 'import' in request.POST:
@@ -407,35 +408,100 @@ def stix_view(request):
                 c = {
                     "items":data["items"],
                     "groups":data["groups"],
+                    "subgroups":data["subgroups"],
+                    "color":data["color"],
+                    "form":TimelineForm(),
                 }
                 return render(request, 'timeline_viz.html', c)
 
-        elif 'parse_url' in request.POST:
+        elif 'parse_stix2' in request.POST or 'parse_url' in request.POST:
             form = InputForm(request.POST)
+            tform = TypeSelectForm(request.POST)
+            types = []
+            relation = []
+            if tform.is_valid():
+                types = tform.cleaned_data["types"]
+                types = list(types.values_list("name", flat=True))
+                relation = tform.cleaned_data["relation"]
+                relation = list(relation.values_list("name", flat=True))
+                #print(relation)
             if form.is_valid():
                 b = {"objects":[]}
-                urls = form.cleaned_data["input"]
-                for url in urls.split("\n"):
-                    if not re.match("^https?://.+", url):
-                        messages.add_message(
-                            request,
-                            messages.ERROR,
-                            'ERROR: Invalid Input -> '+url,
-                        )
-                    else:
-                        res = requests.get(url.strip())
-                        if res:
-                            j = res.json()
+                if 'parse_url' in request.POST:
+                    urls = form.cleaned_data["input"]
+                    for url in urls.split("\n"):
+                        if not re.match("^https?://.+", url):
+                            messages.add_message(
+                                request,
+                                messages.ERROR,
+                                'ERROR: Invalid Input -> '+url,
+                            )
+                        else:
+                            res = requests.get(url.strip())
+                            if res:
+                                j = res.json()
+                                b = stix_filter(j, b, types=types, relation=relation)
+                                
+                elif 'parse_stix2' in request.POST:
+                    j = form.cleaned_data["input"]
+                    b = stix_filter(json.loads(j), b, types=types, relation=relation)
+                    """
+                    if True:
+                        if True:
+                            temp = {}
                             if "objects" in j:
                                 for o in j["objects"]:
-                                    if not o in b["objects"]:
-                                        b["objects"].append(o)
+                                    temp[o["id"]] = o
+                                    if o["type"] in types:
+                                        if not o in b["objects"]:
+                                            b["objects"].append(o)
+                            for o in b["objects"]:
+                                if o["type"] == "relationship":
+                                    src = temp[o["source_ref"]]
+                                    if src not in b["objects"]:
+                                        b["objects"].append(src)
+                                    tgt = temp[o["target_ref"]]
+                                    if tgt not in b["objects"]:
+                                        b["objects"].append(tgt)
+                    """
                 c = {
                     "stix":json.dumps(b, indent=2),
                 }
                 return render(request, 'stix_viz.html', c)
     c = {
         "form":form,
+        "tform":tform,
     }
     return render(request, 'stix_view.html', c)
 
+def stix_filter(j, b, types=[], relation=[]):
+    #j = res.json()
+    temp = {}
+    if "objects" in j:
+        for o in j["objects"]:
+            temp[o["id"]] = o
+            if o["type"] in types:
+                if o["type"] == "relationship":
+                    if o["relationship_type"] in relation:
+                        if not o in b["objects"]:
+                            b["objects"].append(o)
+                else:
+                    if not o in b["objects"]:
+                        b["objects"].append(o)
+    for o in b["objects"]:
+        if o["type"] == "relationship":
+            src = temp[o["source_ref"]]
+            if src not in b["objects"]:
+                b["objects"].append(src)
+            tgt = temp[o["target_ref"]]
+            if tgt not in b["objects"]:
+                b["objects"].append(tgt)
+        elif o["type"] == "sighting":
+            for wsr in o["where_sighted_refs"]:
+                w = temp[wsr]
+                if w not in b["objects"]:
+                    b["objects"].append(w)
+            sor = temp[o["sighting_of_ref"]]
+            if sor not in b["objects"]:
+                b["objects"].append(sor)
+    return b

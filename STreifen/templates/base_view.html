@@ -433,7 +433,7 @@ STIX
 {% for r in rels %}
 <tr>
 <td>
-<a class="btn btn-default btn-xs" href="/stix/{{r.object_id.object_id}}">></a>
+<!--<a class="btn btn-default btn-xs" href="/stix/{{r.object_id.object_id}}">></a>-->
 <input class="object_id" type="checkbox" value="{{r.object_id.object_id}}">
 </td>
 <td>
@@ -446,7 +446,9 @@ STIX
 </td>
 <td style="vertical-align:middle">
 <!--<span class="label label-info">{{r.relationship_type.name}}</span>-->
+<a href="/stix/{{r.object_id.object_id}}">
 {{r.relationship_type.name}}
+</a>
 </td>
 <td>
 {% for t in objects %}

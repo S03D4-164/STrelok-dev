@@ -174,8 +174,14 @@ def cnt_tgt_by_label():
         where_sighted_refs__object_id__startswith="identity--",
         sighting_of_ref__object_id__startswith="threat-actor--",
     )
+    rels = Relationship.objects.filter(
+        source_ref__object_id__startswith='threat-actor--',
+        relationship_type__name='targets',
+        target_ref__object_id__startswith='identity--',
+    )
     tgt = Identity.objects.filter(
-        id__in=sights.values_list("where_sighted_refs",flat=True)
+        Q(id__in=sights.values_list("where_sighted_refs",flat=True))|\
+        Q(id__in=rels.values_list("target_ref",flat=True)),
     )
     for l in IdentityLabel.objects.all():
         cnt = tgt.filter(labels=l).count()
@@ -183,6 +189,11 @@ def cnt_tgt_by_label():
             "name": l.value,
             "y": cnt,
             "drilldown":{"data": []},
+        }
+        dd = cnt_actor_by_tgt_label(l, rels)
+        item["drilldown"] = {
+            "name": "Threat actor targets" + l.value,
+            "data": dd,
         }
         if item["y"]:
             if not item in dataset:

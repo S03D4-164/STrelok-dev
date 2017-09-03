@@ -7,7 +7,27 @@
 {% block datatableslib %}{% endblock %}
 {% block visjslib %}{% endblock %}
 {% block jquery %}
-<link rel="stylesheet" type="text/css" href="/static/stixviz/app.css" /> 
+<!--<link rel="stylesheet" type="text/css" href="/static/stixviz/app.css" /> -->
+<script>
+$(document).ready(
+    function(){
+        $("input#select_types").click(function(){
+            if($(this).prop("checked")){
+                $('ul#id_types :checkbox').prop('checked',true);
+            }else{
+                $('ul#id_types :checkbox').prop('checked',false);
+            };
+        });
+        $("input#select_relation").click(function(){
+            if($(this).prop("checked")){
+                $('ul#id_relation :checkbox').prop('checked',true);
+            }else{
+                $('ul#id_relation :checkbox').prop('checked',false);
+            };
+        });
+    }
+);
+</script>
 {% endblock%}
 
 {% block container %}
@@ -51,11 +71,37 @@ STIX
 </div>
 <div class="panel-body">
 <form method="post">{% csrf_token %}
-Parse
-<button type="button" id="viz" onclick=toggleViz("id_input") >Text</button>
-<input type="submit" name="parse_url" value="URL">
-{{form.input}}
-<input type="submit" name="import" value="Import">
+<!--<button type="button" id="viz" onclick=toggleViz("id_input") >Visualize</button>-->
+<div class="col-md-12">
+
+<div class="col-md-7">
+Parse:
+<input type="submit" name="parse_url" value="URLs">
+<input type="submit" name="parse_stix2" value="STIX2">
+<br>
+{{form}}
+</div>
+
+<div class="col-md-5">
+Filter:
+<div class="col-md-12">
+
+<div class="col-md-6" id="types_form">
+<input type="checkbox" id="select_types" checked>types</input>
+{{tform.types}}
+</div>
+
+<div class="col-md-6" id="rel_form">
+<input type="checkbox" id="select_relation" checked>relationship</input>
+{{tform.relation}}
+</div>
+
+</div>
+</div>
+
+</div>
+
+<!--<input type="submit" name="import" value="Import">-->
 </form>
 </div><!--/.panel-body-->
 </div><!--/.panel-->
