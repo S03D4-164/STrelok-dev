@@ -25,7 +25,7 @@ def timeline_view(request, id=None):
         "items": data["items"],
         "groups": data["groups"],
         "subgroups": data["subgroups"],
-        "color": data["color"],
+        "colors": data["colors"],
     }
     return render(request, "timeline_viz.html", c)
 
@@ -40,15 +40,17 @@ def find_ref(ref, stix):
 def stix2timeline(stix):
     if not "objects" in stix:
         return None
-    #groups = [
-    #{"id":"campaign","content":"campaign"}
-    #]
     groups = {}
-    subgroups = []
-    items = []
+    subgroups = {}
+    items = {}
     color = {}
+    data = {
+        "groups":{},
+        "subgroups":{},
+        "items":{},
+        "colors":{},
+    }
     for obj in stix["objects"]:
-        #print(obj)
         if obj["type"] == "sighting":
             sighting = DotMap(obj)
             sor = sighting.sighting_of_ref
@@ -58,22 +60,22 @@ def stix2timeline(stix):
                 so = find_ref(sor, stix)
                 if so:
                     so = DotMap(so)
-                    sighted = {
+                    sg = {
                         "id": so.id,
                         "content": so.name,
                         "group": so.type
                     }
-                    if not sighted in subgroups:
-                        subgroups.append(sighted)
-                    category = {
-                        "id": sighted["group"],
-                        "content": sighted["group"],
+                    if not sg["id"] in data["subgroups"]:
+                        data["subgroups"][sg["id"]] = sg
+                    g = {
+                        "id": sg["group"],
+                        "content": sg["group"],
                         "nested_groups":[]
                     }
-                    if not sighted["group"] in groups:
-                        groups[sighted["group"]] = category
-                    if not sighted["id"] in groups[sighted["group"]]["nested_groups"]:
-                        groups[sighted["group"]]["nested_groups"].append(sighted["id"])
+                    if not g["id"] in data["groups"]:
+                        data["groups"][g["id"]] = g
+                    if not sg["id"] in data["groups"][g["id"]]["nested_groups"]:
+                        data["groups"][g["id"]]["nested_groups"].append(sg["id"])
                     wsr = sighting.where_sighted_refs
                     for w in wsr:
                         if w.split("--")[0] == "identity":
@@ -83,9 +85,10 @@ def stix2timeline(stix):
                                 item = {
                                     "id": sighting.id,
                                     "content": tgt.name,
-                                    "group": sighted["id"],
+                                    "group": sg["id"],
                                     "start": sighting.first_seen,
                                     "className":sighting.type,
+                                    "subgroup": "",
                                     "end": "",
                                     "title": "",
                                 }
@@ -93,14 +96,17 @@ def stix2timeline(stix):
                                     item["end"] = sighting.last_seen
                                 if tgt.sectors:
                                     item["subgroup"] = tgt.sectors[0]
-                                #if tgt.sectors.all():
-                                #    item["className"] = tgt.sectors.all()[0]
-                                item["title"] = " - ".join([item["start"],item["end"]])
-                                if not item in items:
-                                    items.append(item)
-                                    if not item["className"] in color:
-                                        color[item["className"]] = "#" + \
-                                            hashlib.md5(item["className"].encode("utf8")).hexdigest()[0:6]
+                                    item["className"] = tgt.sectors[0]
+                                item["title"] = "<div>"
+                                item["title"] += " - ".join([item["start"],item["end"]])
+                                item["title"] += "<br>subgroup: " + item["subgroup"]
+                                item["title"] += "<br>className: " + item["className"]
+                                item["title"] += "</div>"
+                                if not item["id"] in data["items"]:
+                                    data["items"][item["id"]] = item
+                                    if not item["className"] in data["colors"]:
+                                        cc = hashlib.md5(item["className"].encode("utf8")).hexdigest()[0:6]
+                                        data["colors"][item["className"]] = "#" + str(cc)
         elif obj["type"] == "report":
             report = DotMap(obj)
             start = report.created
@@ -121,50 +127,80 @@ def stix2timeline(stix):
                     actor = find_ref(ref, stix)
                     if actor:
                         actor = DotMap(actor)
-                        a = {
+                        sg = {
                             "id": actor.id,
                             "content": actor.name,
                             "group":actor.type,
                         }
-                        if not a in subgroups:
-                            subgroups.append(a)
-                        category = {
-                            "id": a["group"],
-                            "content": a["group"],
+                        if not sg["id"] in data["subgroups"]:
+                            data["subgroups"][sg["id"]] = sg
+                        g = {
+                            "id": sg["group"],
+                            "content": sg["group"],
                             "nested_groups":[]
                         }
-                        if not a["group"] in groups:
-                            groups[a["group"]] = category
-                        if not a["id"] in groups[a["group"]]["nested_groups"]:
-                            groups[a["group"]]["nested_groups"].append(a["id"])
+                        if not sg["group"] in data["groups"]:
+                            data["groups"][sg["group"]] = g
+                        if not sg["id"] in data["groups"][g["id"]]["nested_groups"]:
+                            data["groups"][g["id"]]["nested_groups"].append(sg["id"])
                         if not item["group"]:
-                            item["group"] = a["id"]
-            if not item in items:
-                items.append(item)
-                if not item["className"] in color:
-                    color[item["className"]] = "#" + \
-                        hashlib.md5(item["className"].encode("utf8")).hexdigest()[0:6]
+                            item["group"] = sg["id"]
+            if not item["id"] in data["items"]:
+                data["items"][item["id"]] = item
+                if not item["className"] in data["colors"]:
+                    cc = hashlib.md5(item["className"].encode("utf8")).hexdigest()[0:6]
+                    data["colors"][item["className"]] = "#" + str(cc)
         elif obj["type"] == "campaign":
             campaign = DotMap(obj)
             if campaign.first_seen:
                 item = {
                     "id": campaign.id,
                     "content": campaign.name,
-                    "group": "campaign",
+                    "group": None,
                     "start": campaign.first_seen,
                     "end":"",
                     "title":"",
+                    "className":campaign.type,
                 }
                 if campaign.last_seen:
                     item["end"] = campaign.last_seen
-                if not item in items:
-                    items.append(item)
-                    if not item["group"] in groups:
-                        groups[item["group"]] = {
+                for s in stix["objects"]:
+                    if s["type"] == "relationship":
+                        if s["relationship_type"] == "attributed-to" and s["source_ref"] == campaign.id:
+                            t = find_ref(s["target_ref"], stix)
+                            #if t:
+                            t = DotMap(t)
+                            if t.type == "threat-actor":
+                                sg = {
+                                    "id":t.id,
+                                    "content":t.name,
+                                    "group":t.type,
+                                }
+                                if not item["group"]:
+                                    item["group"] = sg["id"]
+                                if not sg["id"] in data["subgroups"]:
+                                    data["subgroups"][sg["id"]] = sg
+                                g = {
+                                    "id":sg["group"],
+                                    "content":sg["group"],
+                                    "nested_groups":[],
+                                }
+                                if not sg["group"] in data["groups"]:
+                                    data["groups"][g["id"]] = g
+                                if not sg["id"] in data["groups"][g["id"]]["nested_groups"]:
+                                    data["groups"][g["id"]]["nested_groups"].append(sg["id"])
+                if not item["group"]:
+                    item["group"] = "campaign"
+                    if not "campaign" in data["groups"]:
+                        data["groups"]["campaign"] = {
                             "id":"campaign",
                             "content":"campaign",
                         }
-        #elif obj["type"] == "indicator":
+                if not item["id"] in data["items"]:
+                    data["items"][item["id"]] = item
+                    if not item["className"] in data["colors"]:
+                        cc = hashlib.md5(item["className"].encode("utf8")).hexdigest()[0:6]
+                        data["colors"][item["className"]] = "#" + str(cc)
     g = []
     for k,v in groups.items():
         g.append(v)
@@ -174,7 +210,8 @@ def stix2timeline(stix):
         "subgroups":subgroups,
         "color":color,
     }
-    return dataset
+    #return dataset
+    return data
 
 def data_timeline(request=None, model=None, field=None):
     models = [

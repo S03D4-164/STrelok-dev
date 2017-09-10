@@ -116,7 +116,9 @@ class ObservableObjectData(BaseDatatableView):
     order_columns = ['id', 'type']
     max_display_length = 100
     def render_column(self, row, column):
-        if column == 'type':
+        if column == 'id':
+            return "<a href=/observable/{0}>{0}</href>".format(row.id)
+        elif column == 'type':
             t = row.type.name
             if row.type.model_name:
                 m = apps.get_model(row._meta.app_label, row.type.model_name)

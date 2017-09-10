@@ -29,6 +29,169 @@ def bulk_create_indicator(label, property, input,   src=None):
                 src.object_refs.add(i.object_id)
     return
 
+def get_obs(o):
+    t = o.type
+    if t.model_name:
+        #print(t.model_name)
+        m = apps.get_model(t._meta.app_label, t.model_name)
+        obs = m.objects.get(id=o.id)
+        return obs
+    return None
+
+def obs_view(request, id):
+    o = ObservableObject.objects.get(id=id)
+    dict = {
+        id:{
+            "type":o.type.name
+        } 
+    }
+    if o.type.model_name:
+        m = apps.get_model(o._meta.app_label, o.type.model_name)
+        o = m.objects.filter(id=o.id)
+        print(o.values())
+        for k, v in o.values()[0].items():
+            if not "id" in k and v:
+                dict[id][k] = v
+        o = o[0]
+    if request.POST:
+        print(request.POST)
+        if "update" in request.POST:
+            form = getform(o.type.name,instance=o, request=request)
+            if form.is_valid():
+                s = form.save()
+                new = form.cleaned_data["new_refs"]
+                for line in new.split("\n"):
+                    if line:
+                        o, p = create_obs_from_line(line)
+                        s.resolve_to_refs.add(o)
+                        if not p in pattern:
+                            pattern.append(p)
+                s.save()
+                
+    form = getform(o.type.name,instance=o)
+    objects = []
+    rels = []
+    ind = Indicator.objects.filter(pattern__pattern__icontains=o.value)
+    for i in ind:
+        if not i in objects:
+            objects.append(i)
+            rel = Relationship.objects.filter(
+                source_ref=i.object_id,
+                relationship_type=RelationshipType.objects.get(name="indicates")
+            )
+            for r in rel:
+                if not r in rels:
+                    rels.append(r)
+            for tgt in rel.values_list("target_ref", flat=True):
+                t = get_obj_from_id(tgt)
+                if not t in objects:
+                    objects.append(t)
+    c = {
+        "obj":o,
+        "type":o.type.name,
+        "form":form,
+        "stix":json.dumps(dict, indent=2),
+        "objects":objects,
+        "rels":rels,
+    }
+    return render(request, 'base_view.html', c)
+
+def create_obs_from_line(line):
+    o = None
+    pattern = None
+    type = line.strip().split(":")[0]
+    value = ":".join(line.strip().split(":")[1:]).strip()
+    t = ObservableObjectType.objects.filter(name=type)
+    if t.count() == 1:
+        t = t[0]
+        if t.model_name:
+            m = apps.get_model(t._meta.app_label, t.model_name)
+            if t.name == "file":
+                o, cre = m.objects.get_or_create(
+                    type = t,
+                    name = value
+                )
+                pattern = type + ":name="+ value
+            else:
+                o, cre = m.objects.get_or_create(
+                    type = t,
+                    value = value
+                )
+                pattern = type + ":value=" + value
+    return o, pattern
+
+def obs2pattern(observable, new=None, indicator=None, generate=False):
+    pattern = []
+    obs = []
+    if observable:
+        for o in observable:
+            obs.append(o.id)
+            o = get_obs(o)
+            p = o.type.name
+            if hasattr(o,"name"):
+                p += ":name=" + o.name
+            elif hasattr(o,"value"):
+                p += ":value=" + o.value
+            pattern.append(p)
+    for line in new.split("\n"):
+        if line:
+            o, p = create_obs_from_line(line)
+            if o:
+                obs.append(o.id)
+            if p:
+                pattern.append(p)
+            """
+            type = line.strip().split(":")[0]
+            value = ":".join(line.strip().split(":")[1:]).strip()
+            t = ObservableObjectType.objects.filter(name=type)
+            if t.count() == 1:
+                t = t[0]
+                #print(t)
+                if t.model_name:
+                    #print(t.model_name)
+                    m = apps.get_model(t._meta.app_label, t.model_name)
+                    o = None
+                    if t.name == "file":
+                        o, cre = m.objects.get_or_create(
+                            type = t,
+                            name = value
+                        )
+                    else:
+                        o, cre = m.objects.get_or_create(
+                            type = t,
+                            value = value
+                        )
+                    if o and not o.id in obs:
+                        obs.append(o.id)
+                        pattern.append(type +"="+ value)
+            """
+    p = None
+    if pattern:
+        if indicator:
+            p = indicator.pattern
+            if p:
+                p.observable.clear()
+                p.observable.add(*obs)
+                if generate:
+                    p.pattern = " OR ".join(sorted(pattern))
+                    print(p.pattern)
+                p.save()
+            else: 
+                p = IndicatorPattern.objects.create(
+                    pattern = " OR ".join(sorted(pattern))
+                )
+                p.observable.add(*obs)
+                p.save()
+                indicator.pattern = p
+                indicator.save()
+        else:
+            p = IndicatorPattern.objects.create(
+                pattern = " OR ".join(sorted(pattern))
+            )
+            p.observable.add(*obs)
+            p.save()
+    return p
+
 def sdo_list(request, type):
     sot = STIXObjectType.objects.get(name=type)
     form = getform(type)
@@ -67,6 +230,10 @@ def sdo_list(request, type):
                 elif s.object_type.name == "indicator":
                     observable = form.cleaned_data["observable"]
                     if observable:
+                        p = obs2pattern(observable)
+                        s.pattern = p
+                        s.save()
+                        """
                         pattern = []
                         obs = []
                         for line in observable.split("\n"):
@@ -102,6 +269,7 @@ def sdo_list(request, type):
                             p.save()
                             s.pattern = p
                             s.save()
+                        """
                 messages.add_message(
                     request, messages.SUCCESS, 'Created -> '+s.name,
                 )
@@ -219,6 +387,8 @@ def getform(type, request=None, instance=None, report=None):
         return IndicatorForm(post,instance=instance)
     elif type == "campaign":
         return CampaignForm(post,instance=instance)
+    elif type == "domain-name":
+        return DomainNameForm(post,instance=instance)
     elif type == "relationship":
         form = RelationshipForm(post,instance=instance)
         if report:
@@ -449,9 +619,10 @@ def sdo_view(request, id):
                 coform = getform(sot.name, request=request)
                 if coform.is_valid():
                     saved = coform.save()
-                    if sdo.object_type.name == "report":
-                        report = add_object_refs(sdo, saved.object_id)
-                        report.save()
+                    #if sot.name == "indicator":
+                    
+                    report = add_object_refs(sdo, saved.object_id)
+                    report.save()
             else:
                 dr = request.POST.get('relation')
                 if dr:
@@ -520,9 +691,23 @@ def sdo_view(request, id):
                     request, messages.SUCCESS, 'Updated.'
                 )
                 return redirect("/stix/"+id)
+        elif 'update_pattern' in request.POST:
+            print(sdo.pattern)
+            pform = IndicatorPatternForm(request.POST, instance=sdo.pattern)
+            if pform.is_valid():
+                #p = pform.save()
+                #print(p)
+                obs = pform.cleaned_data["observable"]
+                new_obs = pform.cleaned_data["new_observable"]
+                gen = False
+                if "generate_pattern" in request.POST:
+                    gen = True
+                p = obs2pattern(obs, new=new_obs, indicator=sdo, generate=gen)
+                return redirect("/stix/"+id)
 
     c = {
         "obj": sdo,
+        "type": sdo.object_type.name,
         "form": form,
         "soform": soform,
         "aoform": aoform,
@@ -536,4 +721,6 @@ def sdo_view(request, id):
         "stix":stix,
         "drform": drform,
     }
+    if sdo.object_type.name == "indicator":
+        c["pform"] = IndicatorPatternForm(instance=sdo.pattern)
     return render(request, 'base_view.html', c)

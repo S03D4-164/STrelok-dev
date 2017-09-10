@@ -7,7 +7,7 @@
 {% block datatableslib %}{% endblock %}
 {% block jquery %}
 <style>
-{% for k,v in color.items %}
+{% for k,v in colors.items %}
 .vis-item.{{k}} {
   background-color: {{v}};
 }
@@ -23,27 +23,25 @@
 <div class="panel-heading">Timeline{% if obj %} of <a href="/stix/{{obj.object_id.object_id}}">{{obj}}</a>{% endif %}</div>
 <div class="panel-body">
 
-<div class="col-md-10" id="visualization" >
-</div>
-
-<div class="col-md-2">
-<div class="btn-group-vertical">
+<div class="col-md-9" id="visualization" >
 <input class="btn"  type="button" id="zoomIn" value="Zoom in"/>
 <input class="btn" type="button" id="zoomOut" value="Zoom out"/>
 <input class="btn" type="button" id="moveLeft" value="Move left"/>
 <input class="btn" type="button" id="moveRight" value="Move right"/>
 </div>
-<h4>Legend</h4>
-{% for k,v in color.items %}
-<input class="legend" id="{{k}}" type="checkbox" value="{{k}}" checked>
-<span style="color:{{v}}">■</span>: {{k}}<br>
-{% endfor %}
-<hr>
+
+<div class="col-md-3">
 <form method=post>{% csrf_token %}
 <div id="types_form">
 {{form.as_p}}
 </div>
 </form>
+<hr>
+<h4>Legend</h4>
+{% for k,v in colors.items %}
+<input class="legend" id="{{k}}" type="checkbox" value="{{k}}" checked>
+<span style="font-size:200%;color:{{v}}">■</span>: {{k}}<br>
+{% endfor %}
 </div>
 
 </div><!--/panel-body-->
@@ -53,31 +51,31 @@
 <script type="text/javascript">
 {% if groups %}
 var groups = new vis.DataSet();
-groups.add([{% for g in groups %}
+groups.add([{% for k,v in groups.items %}
 {
-    id: "{{g.id}}",
-    content: "{{g.content}}",
-    nestedGroups: [{% for n in g.nested_groups%}"{{n}}",{% endfor %}],
+    id: "{{v.id}}",
+    content: "{{v.content}}",
+    nestedGroups: [{% for n in v.nested_groups%}"{{n}}",{% endfor %}],
 },
 {% endfor %}]);
 {% endif %}
 
 {% if subgroups %}
-groups.add([{% for g in subgroups %}
+groups.add([{% for k,v in subgroups.items %}
 {
-    id: "{{g.id}}",
-    content: "{{g.content}}",
+    id: "{{v.id}}",
+    content: "{{v.content}}",
 },
 {% endfor %}]);
 {% endif %}
 
 var items = new vis.DataSet();
-items.add([{% for i in items %}
+items.add([{% for k,i in items.items %}
 {% if i.group %}
 {
     id: "{{i.id}}",
     content: "{{i.content}}",
-    title: "{{i.title}}",
+    title: "{{i.title|safe}}",
     group: "{{i.group}}",
     subgroup: "{{i.subgroup}}",
     className: "{{i.className}}",
@@ -92,7 +90,8 @@ var options = {
     align: 'left',
     orientation: 'top',
     type: 'point',
-    //horizontalScroll:true,
+    stack: true,
+    stackSubgroups: false,
 };
 {% if groups %}
 var timeline = new vis.Timeline(container, items, groups, options);
@@ -112,8 +111,18 @@ document.getElementById('zoomIn').onclick    = function () { timeline.zoomIn( 0.
 document.getElementById('zoomOut').onclick   = function () { timeline.zoomOut( 0.2); };
 document.getElementById('moveLeft').onclick  = function () { move(0.2); };
 document.getElementById('moveRight').onclick  = function () { move(-0.2); };
-document.getElementById('id_type').onchange = function () {
+
+document.getElementById('id_plot').onchange = function () {
     timeline.setOptions({type:this.value});
+};
+document.getElementById('id_stack_groups').onchange = function () {
+    timeline.setOptions({stack:$(this).prop("checked")});
+};
+document.getElementById('id_stack_subgroups').onchange = function () {
+    timeline.setOptions({stackSubgroups:$(this).prop("checked")});
+};
+document.getElementById('id_show_minor_labels').onchange = function () {
+    timeline.setOptions({showMinorLabels:$(this).prop("checked")});
 };
 
 $('input.legend').click(function() {

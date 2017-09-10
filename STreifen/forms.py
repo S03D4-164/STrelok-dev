@@ -17,11 +17,14 @@ class InputForm(forms.Form):
     )
 
 class TimelineForm(forms.Form):
-    type = forms.ChoiceField(choices=(
+    plot = forms.ChoiceField(choices=(
         ("point","point"),
         ("box","box"),
         ("","default")
     ),initial="point")
+    stack_groups = forms.BooleanField()
+    stack_subgroups = forms.BooleanField()
+    show_minor_labels = forms.BooleanField()
     group = forms.ModelMultipleChoiceField(
         queryset=STIXObjectType.objects.filter(
             name__in=[
@@ -36,6 +39,9 @@ class TimelineForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super(TimelineForm, self).__init__(*args, **kwargs)
         self.fields["group"].required = False
+        self.fields["stack_groups"].required = False
+        self.fields["stack_subgroups"].required = False
+        self.fields["show_minor_labels"].required = False
 
 class RelationshipForm(forms.ModelForm):
     class Meta:
@@ -46,6 +52,15 @@ class RelationshipForm(forms.ModelForm):
             "target_ref",
             "description",
         ]
+    def __init__(self, *args, **kwargs):
+        super(RelationshipForm, self).__init__(*args, **kwargs)
+        exclude_rel = STIXObjectID.objects.exclude(
+                Q(object_id__startswith="relationship--")|\
+                Q(object_id__startswith="sighting--")|\
+                Q(object_id__startswith="report--")
+        )
+        self.fields["source_ref"].queryset = exclude_rel
+        self.fields["target_ref"].queryset = exclude_rel 
 
 class CampaignForm(forms.ModelForm):
     new_alias = forms.CharField()
@@ -67,6 +82,11 @@ class CampaignForm(forms.ModelForm):
         )
 
 class SightingForm(forms.ModelForm):
+    observable = forms.CharField(
+        widget=forms.Textarea(
+            attrs={'style':'height:100px;'}
+        )
+    )
     sighting_of = forms.ModelMultipleChoiceField(
         queryset = STIXObjectID.objects.all()
     )
@@ -78,7 +98,7 @@ class SightingForm(forms.ModelForm):
             "sighting_of",
             "first_seen",
             "last_seen",
-            "description",
+            #"description",
         ]
     def __init__(self, *args, **kwargs):
         super(SightingForm, self).__init__(*args, **kwargs)
@@ -369,7 +389,7 @@ class TypeSelectForm(forms.Form):
 class IndicatorForm(forms.ModelForm):
     observable = forms.CharField(
         widget=forms.Textarea(
-            attrs={'style':'height:200px;'}
+            attrs={'style':'height:100px;'}
         )
     )
     class Meta:
@@ -383,13 +403,25 @@ class IndicatorForm(forms.ModelForm):
             #"pattern",
         ]
 
-class PatternForm(forms.ModelForm):
+class IndicatorPatternForm(forms.ModelForm):
+    generate_pattern = forms.BooleanField()
+    new_observable = forms.CharField(
+        widget=forms.Textarea(
+            attrs={'style':'height:100px;'}
+        )
+    )
     class Meta:
         model = IndicatorPattern
         fields = [
             "observable",
             "pattern",
         ]
+    def __init__(self, *args, **kwargs):
+        super(IndicatorPatternForm, self).__init__(*args, **kwargs)
+        self.fields["generate_pattern"].required = False
+        self.fields["new_observable"].required = False
+        self.fields["observable"].required = False
+        self.fields["pattern"].required = False
 
 
 class SelectObservableForm(forms.Form):
@@ -413,3 +445,15 @@ def get_model_from_type(type):
     m = getattr(mymodels, name)
     return m
 
+class DomainNameForm(forms.ModelForm):
+    new_refs = forms.CharField(
+        widget=forms.Textarea(
+            attrs={'style':'height:100px;'}
+        )
+    )
+    class Meta:
+        model = DomainNameObject
+        fields = [
+            "value",
+            "resolve_to_refs",
+        ]

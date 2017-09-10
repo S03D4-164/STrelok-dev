@@ -1,7 +1,7 @@
 from django.conf.urls import url
 from django.contrib import admin
 
-from .views.sdo import sdo_list,sdo_view
+from .views.sdo import sdo_list,sdo_view, obs_view
 from .views.drs import viz_drs, data_drs
 from .views.stix import stix_view ,stix2_json, stix2type_json
 from .views.taxii import taxii_discovery, taxii_collection, taxii_get_objects
@@ -28,6 +28,7 @@ urlpatterns = [
     url(r'^stix/all.json$', stix2_json),
     url(r'^stix/(?P<type>[^/]+)\.json$', stix2type_json),
     url(r'^stix/(?P<type>[^/]+)', sdo_list),
+    url(r'^observable/(?P<id>[^/]+)', obs_view),
     url(r'^taxii/api/collections/(?P<id>[^/]+)/id/(?P<object_id>[^/]+)/$', taxii_collection),
     url(r'^taxii/api/collections/(?P<id>[^/]+)/objects/$', taxii_get_objects),
     url(r'^taxii/api/collections/(?P<id>[^/]+)/$', taxii_collection),
