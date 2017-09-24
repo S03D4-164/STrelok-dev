@@ -194,6 +194,25 @@ def stix2_db(obj):
                     c.aliases.add(a)
             c.save()
             return c
+        elif type == 'indicator':
+            i, cre = model.objects.get_or_create(name=obj["name"])
+            if "description" in obj:
+                i.description = obj["description"]
+            if "labels" in obj:
+                labels = obj["labels"]
+                for label in labels: 
+                    l, cre = IndicatorLabel.objects.get_or_create(value=label)
+                    i.labels.add(l)
+            if "pattern" in obj:
+                p, cre = IndicatorPattern.objects.get_or_create(pattern=obj["pattern"])
+                i.pattern = p
+            if "valid_from" in obj:
+                i.valid_from = obj["valid_from"]
+            if "valid_until" in obj:
+                i.valid_until = obj["valid_until"]
+            i.save()
+            return i
+
         elif type == 'identity':
             i, cre = model.objects.get_or_create(name=obj["name"])
             if "description" in obj:
@@ -409,7 +428,7 @@ def stix_view(request):
                     "items":data["items"],
                     "groups":data["groups"],
                     "subgroups":data["subgroups"],
-                    "color":data["color"],
+                    "colors":data["colors"],
                     "form":TimelineForm(),
                 }
                 return render(request, 'timeline_viz.html', c)
@@ -445,25 +464,6 @@ def stix_view(request):
                 elif 'parse_stix2' in request.POST:
                     j = form.cleaned_data["input"]
                     b = stix_filter(json.loads(j), b, types=types, relation=relation)
-                    """
-                    if True:
-                        if True:
-                            temp = {}
-                            if "objects" in j:
-                                for o in j["objects"]:
-                                    temp[o["id"]] = o
-                                    if o["type"] in types:
-                                        if not o in b["objects"]:
-                                            b["objects"].append(o)
-                            for o in b["objects"]:
-                                if o["type"] == "relationship":
-                                    src = temp[o["source_ref"]]
-                                    if src not in b["objects"]:
-                                        b["objects"].append(src)
-                                    tgt = temp[o["target_ref"]]
-                                    if tgt not in b["objects"]:
-                                        b["objects"].append(tgt)
-                    """
                 c = {
                     "stix":json.dumps(b, indent=2),
                 }

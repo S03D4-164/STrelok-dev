@@ -14,6 +14,7 @@ def data_drs(request):
     tsform = TypeSelectForm()
     nodes = []
     edges = []
+    icon = True
     drs = None
     if request.method == "POST":
         #print(request.POST)
@@ -23,30 +24,37 @@ def data_drs(request):
             #print(types)
             rels = tsform.cleaned_data["relation"]
             #print(rels)
+            icon = tsform.cleaned_data["icon"]
             drs = DefinedRelationship.objects.filter(
                 Q(source__in=types)|Q(target__in=types),
             ).filter(
                 type__in=rels
             )
+    else:
+        drs = DefinedRelationship.objects.all()
             
     for dr in drs:
         for sot in (dr.source, dr.target):
             node = {
-                'id': sot.id,
+                'id': sot.name,
                 'label': sot.name,
+                'group': sot.name,
+                'font': {'strokeWidth': 2, 'strokeColor': 'white'},
             }
             if not node in nodes:
                 nodes.append(node)
         edge = {
-            'from': dr.source.id,
-            'to': dr.target.id,
+            'from': dr.source.name,
+            'to': dr.target.name,
             'label': dr.type.name,
+            'font': {'strokeWidth': 2, 'strokeColor': 'white'},
         }
         if not edge in edges:
             edges.append(edge)
     dataset = {
         'nodes': nodes,
         'edges': edges,
+        'icon': icon,
     }
     return JsonResponse(dataset)
         

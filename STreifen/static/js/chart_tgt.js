@@ -1,7 +1,7 @@
-function actorChart(data){
+function tgtChart(data){
 //data = {{data|safe}};
-subtitle = 'Click the column to view target category';
-xaxis = 'Threat Actor';
+subtitle = 'Click the column';
+xaxis = 'Identity';
 function setChart(options)  {
     chart.series[0].remove(false);
     chart.addSeries({
@@ -21,7 +21,7 @@ function setChart(options)  {
 };
 chart = new Highcharts.chart({
     chart: { renderTo: 'container' },
-    title: { text: 'Count of Targets by Threat Actor' },
+    title: { text: 'Count of Victims by Label' },
     subtitle: { text: subtitle },
     credits: {"enabled":false},
     xAxis: { 
@@ -29,7 +29,7 @@ chart = new Highcharts.chart({
         //title: {text: xaxis } ,
     },
     yAxis: { 
-        title: {text: 'Target Count' } 
+        title: {text: 'Total' } 
     },
     legend: { enabled: false },
     exporting: { enabled: false },
@@ -56,7 +56,7 @@ chart = new Highcharts.chart({
                                 //'name':name,
                                 //'categories':categories,
                                 'data':data,
-                                'type':'column',
+                                'type':'pie',
                             }
                         }
                         setChart(options);
@@ -71,7 +71,7 @@ chart = new Highcharts.chart({
     },
     series: [{
         colorByPoint: true,
-        type: 'column',
+        type: 'pie',
         name: name,
         data: data,
     }]

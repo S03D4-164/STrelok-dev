@@ -22,9 +22,9 @@ class TimelineForm(forms.Form):
         ("box","box"),
         ("","default")
     ),initial="point")
-    stack_groups = forms.BooleanField()
-    stack_subgroups = forms.BooleanField()
-    show_minor_labels = forms.BooleanField()
+    stack_groups = forms.BooleanField(initial=False)
+    stack_subgroups = forms.BooleanField(initial=True)
+    show_minor_labels = forms.BooleanField(initial=True)
     group = forms.ModelMultipleChoiceField(
         queryset=STIXObjectType.objects.filter(
             name__in=[
@@ -32,9 +32,11 @@ class TimelineForm(forms.Form):
                 "campaign",
                 "malware",
                 "threat-actor",
+                "report",
             ]
-        ),
-        widget=forms.CheckboxSelectMultiple(attrs={"checked":""})
+        ),initial=STIXObjectType.objects.filter(name="threat-actor"),
+        #widget=forms.CheckboxSelectMultiple(attrs={"checked":""})
+        widget=forms.CheckboxSelectMultiple()
     )
     def __init__(self, *args, **kwargs):
         super(TimelineForm, self).__init__(*args, **kwargs)
@@ -73,13 +75,14 @@ class CampaignForm(forms.ModelForm):
             "first_seen",
             "last_seen",
             "description",
+            "confidence",
         ]
     def __init__(self, *args, **kwargs):
         super(CampaignForm, self).__init__(*args, **kwargs)
         self.fields["new_alias"].required = False
         self.fields["created_by_ref"].queryset = STIXObjectID.objects.filter(
                 object_id__startswith="identity--",
-        )
+        ).order_by()
 
 class SightingForm(forms.ModelForm):
     observable = forms.CharField(
@@ -373,6 +376,7 @@ class ReportForm(forms.ModelForm):
         )
 
 class TypeSelectForm(forms.Form):
+    icon = forms.BooleanField(initial=True)
     types = forms.ModelMultipleChoiceField(
         queryset=STIXObjectType.objects.all(),
         widget=forms.CheckboxSelectMultiple(attrs={"checked":""})
@@ -385,6 +389,7 @@ class TypeSelectForm(forms.Form):
         super(TypeSelectForm, self).__init__(*args, **kwargs)
         self.fields["types"].required = False
         self.fields["relation"].required = False
+        self.fields["icon"].required = False
 
 class IndicatorForm(forms.ModelForm):
     observable = forms.CharField(
@@ -402,6 +407,9 @@ class IndicatorForm(forms.ModelForm):
             "valid_until",
             #"pattern",
         ]
+    def __init__(self, *args, **kwargs):
+        super(IndicatorForm, self).__init__(*args, **kwargs)
+        self.fields["observable"].required = False
 
 class IndicatorPatternForm(forms.ModelForm):
     generate_pattern = forms.BooleanField()
@@ -457,3 +465,6 @@ class DomainNameForm(forms.ModelForm):
             "value",
             "resolve_to_refs",
         ]
+    def __init__(self, *args, **kwargs):
+        super(DomainNameForm, self).__init__(*args, **kwargs)
+        self.fields["new_refs"].required = False

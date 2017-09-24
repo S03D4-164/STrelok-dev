@@ -5,7 +5,7 @@ import STreifen.forms as myforms
 from ..models import *
 from ..forms import *
 from collections import OrderedDict
-import json
+import json, hashlib
 
 def chart_view(request):
     data = stats_ati()
@@ -206,3 +206,64 @@ def cnt_tgt_by_label():
     )
     dataset = json.dumps(dataset,indent=2)
     return dataset
+
+def kill_chain_view(request):
+    killchain = KillChainPhase.objects.all()
+    objs = STIXObject.objects.filter(
+        object_type__name__in=[
+            "attack-pattern",
+            "indicator",
+            "malware",
+            "tool",
+        ]
+    )
+    data =[] 
+    for obj in objs:
+        o = get_obj_from_id(obj.object_id)
+        if o.kill_chain_phases:
+            #print(o)
+            for kcp in o.kill_chain_phases.all():
+                k = {
+                    "id": str(kcp.id),
+                    "name": kcp.phase_name,
+                }
+                #print(k)
+                if not k in data:
+                    data.append(k)
+                p = {
+                    "id":o.object_id.object_id,
+                    "name": o.name,
+                    "parent": str(kcp.id),
+                    #"value": 1
+                }
+                #print(p)
+                if not p in data:
+                    data.append(p)
+                #print(rels)
+                tas = ThreatActor.objects.all()
+                #for s in rels.values_list("source_ref", flat=True):
+                for ta in tas:
+                    rels = Relationship.objects.filter(
+                        #source_ref__object_id__startswith="threat-actor",
+                        source_ref=ta.object_id,
+                        target_ref__object_id=o.object_id.object_id
+                    )
+                    #ta = get_obj_from_id(s)
+                    a = {
+                        "id": ta.object_id.object_id,
+                        "name": ta.name,
+                        "parent": str(o.object_id.object_id),
+                        "value": 1,
+                        "sortIndex": ta.id,
+                    }
+                    if rels:
+                        a["color"] = "#" + str(hashlib.md5(ta.object_id.object_id.encode("utf8")).hexdigest()[0:6])
+                    else:
+                        a["color"] = "darkgray"
+                        a["name"] = " "
+                    if not a in data:
+                        data.append(a)
+    c = {
+        "data":data
+    }
+    return render(request, 'matrix_viz.html', c)

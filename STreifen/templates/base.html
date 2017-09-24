@@ -4,37 +4,31 @@
 
 <head>
 
-{% block title %}
-<title></title>
-{% endblock %}
-
+{% block title %}<title></title>{% endblock %}
 {% block defaultlib %}
 <script type="text/javascript" charset="utf8" src="/static/datatables/js/jquery.js"></script>
 <link rel="stylesheet" type="text/css" href="/static/bootstrap/css/bootstrap.min.css">
 <link rel="stylesheet" type="text/css" href="/static/bootstrap/css/bootstrap-theme.min.css">
 <script type="text/javascript" src="/static/bootstrap/js/bootstrap.min.js"></script>
-<link rel="stylesheet" type="text/css" href='/static/tablesort/tablesort.css'>
-<script src='/static/tablesort/dist/tablesort.min.js'></script>
 {% endblock %}
-
-{% block datatableslib %}
-<link rel="stylesheet" type="text/css" href="/static/datatables/css/jquery.dataTables.min.css">
-<script type="text/javascript" charset="utf8" src="/static/datatables/js/jquery.dataTables.min.js"></script>
-{% endblock %}
-
 {% block datetimepickerlib %}
 <link rel="stylesheet" type="text/css" href="/static/datetimepicker/build/jquery.datetimepicker.min.css">
 <script type="text/javascript" charset="utf8" src="/static/datetimepicker/build/jquery.datetimepicker.full.min.js"></script>
 {% endblock %}
-
+{% block datatableslib %}
+<link rel="stylesheet" type="text/css" href="/static/datatables/css/jquery.dataTables.min.css">
+<script type="text/javascript" charset="utf8" src="/static/datatables/js/jquery.dataTables.min.js"></script>
+{% endblock %}
+{% block tablesortlib %}
+<link rel="stylesheet" type="text/css" href='/static/tablesort/tablesort.css'>
+<script src='/static/tablesort/dist/tablesort.min.js'></script>
+{% endblock %}
 {% block visjslib %}
 <link href="/static/vis/dist/vis.min.css" type="text/css" rel="stylesheet"></link>
 <script type="text/javascript" src="/static/vis/dist/vis.min.js"></script>
 <script type="text/javascript" src="/static/js/visnetwork.js"></script>
 {% endblock %}
-
 <link rel="stylesheet" type="text/css" href="/static/css/main.css">
-
 {% block jquery %}{% endblock %}
 
 </head>
@@ -47,9 +41,12 @@
 <nav class="navbar navbar-default">
 <ul class="nav navbar-nav">
 
-<li>
-<a href="/">Top</a>
-</li>
+<li><a href="/">Top</a></li>
+
+<li class="dropdown">
+<a class="dropdown-toggle" data-toggle="dropdown" href="#">STIX Domain Object
+<span class="caret"></span></a>
+<ul class="dropdown-menu">
 
 <li><a href="/stix/threat-actor/">Threat Actor</a></li>
 
@@ -63,9 +60,14 @@
 
 <li><a href="/stix/campaign/">Campaign</a></li>
 
+</ul>
+</li>
+
 <li><a href="/timeline/">Timeline</a></li>
 
-<li><a href="/viz/drs/">Relationship</a></li>
+<li><a href="/stix/matrix/">TTP Matrix</a></li>
+
+<li><a href="/stix/">Parser</a></li>
 
 <li><a href="/admin/">Admin</a></li>
 

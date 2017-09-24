@@ -48,13 +48,13 @@ def obs_view(request, id):
     if o.type.model_name:
         m = apps.get_model(o._meta.app_label, o.type.model_name)
         o = m.objects.filter(id=o.id)
-        print(o.values())
+        #print(o.values())
         for k, v in o.values()[0].items():
             if not "id" in k and v:
                 dict[id][k] = v
         o = o[0]
     if request.POST:
-        print(request.POST)
+        #print(request.POST)
         if "update" in request.POST:
             form = getform(o.type.name,instance=o, request=request)
             if form.is_valid():
@@ -71,7 +71,12 @@ def obs_view(request, id):
     form = getform(o.type.name,instance=o)
     objects = []
     rels = []
-    ind = Indicator.objects.filter(pattern__pattern__icontains=o.value)
+    value=None
+    if hasattr(o, "value"):
+        value = o.value
+    elif hasattr(o, "name"):
+        value = o.name
+    ind = Indicator.objects.filter(pattern__pattern__icontains=value)
     for i in ind:
         if not i in objects:
             objects.append(i)
@@ -140,31 +145,6 @@ def obs2pattern(observable, new=None, indicator=None, generate=False):
                 obs.append(o.id)
             if p:
                 pattern.append(p)
-            """
-            type = line.strip().split(":")[0]
-            value = ":".join(line.strip().split(":")[1:]).strip()
-            t = ObservableObjectType.objects.filter(name=type)
-            if t.count() == 1:
-                t = t[0]
-                #print(t)
-                if t.model_name:
-                    #print(t.model_name)
-                    m = apps.get_model(t._meta.app_label, t.model_name)
-                    o = None
-                    if t.name == "file":
-                        o, cre = m.objects.get_or_create(
-                            type = t,
-                            name = value
-                        )
-                    else:
-                        o, cre = m.objects.get_or_create(
-                            type = t,
-                            value = value
-                        )
-                    if o and not o.id in obs:
-                        obs.append(o.id)
-                        pattern.append(type +"="+ value)
-            """
     p = None
     if pattern:
         if indicator:
@@ -174,7 +154,7 @@ def obs2pattern(observable, new=None, indicator=None, generate=False):
                 p.observable.add(*obs)
                 if generate:
                     p.pattern = " OR ".join(sorted(pattern))
-                    print(p.pattern)
+                    #print(p.pattern)
                 p.save()
             else: 
                 p = IndicatorPattern.objects.create(
@@ -233,43 +213,6 @@ def sdo_list(request, type):
                         p = obs2pattern(observable)
                         s.pattern = p
                         s.save()
-                        """
-                        pattern = []
-                        obs = []
-                        for line in observable.split("\n"):
-                            if line:
-                                type = line.strip().split(":")[0]
-                                value = ":".join(line.strip().split(":")[1:]).strip()
-                                t = ObservableObjectType.objects.filter(name=type)
-                                if t.count() == 1:
-                                    t = t[0]
-                                    #print(t)
-                                    if t.model_name:
-                                        #print(t.model_name)
-                                        m = apps.get_model(t._meta.app_label, t.model_name)
-                                        o = None
-                                        if t.name == "file":
-                                            o, cre = m.objects.get_or_create(
-                                                type = t,
-                                                name = value
-                                            )
-                                        else:
-                                            o, cre = m.objects.get_or_create(
-                                                type = t,
-                                                value = value
-                                            )
-                                        if o and not o in obs:
-                                            obs.append(o)
-                                            pattern.append(type +"="+ value)
-                        if pattern:
-                            p = IndicatorPattern.objects.create(
-                                pattern = " OR ".join(sorted(pattern))
-                            )
-                            p.observable.add(*obs)
-                            p.save()
-                            s.pattern = p
-                            s.save()
-                        """
                 messages.add_message(
                     request, messages.SUCCESS, 'Created -> '+s.name,
                 )
@@ -692,7 +635,7 @@ def sdo_view(request, id):
                 )
                 return redirect("/stix/"+id)
         elif 'update_pattern' in request.POST:
-            print(sdo.pattern)
+            #print(sdo.pattern)
             pform = IndicatorPatternForm(request.POST, instance=sdo.pattern)
             if pform.is_valid():
                 #p = pform.save()

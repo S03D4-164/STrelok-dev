@@ -36,7 +36,7 @@ class ReportData(BaseDatatableView):
     def filter_queryset(self, qs):
         search = self.request.GET.get(u'search[value]', None)
         if search:
-            qs = qs.filter(published__value__iregex=search) \
+            qs = qs.filter(published__iregex=search) \
                 | qs.filter(name__iregex=search)
         return qs.distinct()
 
@@ -159,6 +159,12 @@ class IndicatorData(BaseDatatableView):
             return '<a href="/stix/{0}">{1}</a>'.format(row.object_id.object_id,row.name)
         else:
             return super(IndicatorData, self).render_column(row, column)
+    def filter_queryset(self, qs):
+        search = self.request.GET.get(u'search[value]', None)
+        if search:
+            qs = qs.filter(pattern__pattern__iregex=search) \
+                | qs.filter(name__iregex=search)
+        return qs.distinct()
 
 class IdentityData(BaseDatatableView):
     model = Identity

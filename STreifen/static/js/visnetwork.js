@@ -1,14 +1,47 @@
-function visNetwork(nodes, edges){
+function visNetwork(nodes, edges, icon){
+    console.log(icon);
     var container = document.getElementById('network');
     var data = {
         nodes: nodes,
         edges: edges
     };
     var options = visOption();
+    if (icon==true){
+        options = useIcon(options);
+    }
     var network = new vis.Network(container, data, options);
+    network.on("doubleClick", function (params) {
+        var object = network.getSelectedNodes();
+        models = [
+            "threat-actor", 
+            "malware", 
+            "identity",
+            "indicator",
+            "campaign",
+        ];
+        if (models.includes(object[0])){
+            //console.log(object[0]);
+            location.href = "/stix/" + object;
+        }
+    });
     return network;
 };
 
+function useIcon(options){
+    options.groups = {
+        "malware":{ shape: 'image', image:'/static/icons/stix2_malware_icon_tiny_round_v1.png' },
+        "tool":{ shape: 'image', image:'/static/icons/stix2_tool_icon_tiny_round_v1.png' },
+        "vulnerability":{ shape: 'image', image:'/static/icons/stix2_vulnerability_icon_tiny_round_v1.png' },
+        "identity":{ shape: 'image', image:'/static/icons/stix2_identity_icon_tiny_round_v1.png' },
+        "indicator":{ shape: 'image', image:'/static/icons/stix2_indicator_icon_tiny_round_v1.png' },
+        "campaign":{ shape: 'image', image:'/static/icons/stix2_campaign_icon_tiny_round_v1.png' },
+        "threat-actor":{ shape: 'image', image:'/static/icons/stix2_threat_actor_icon_tiny_round_v1.png' },
+        "attack-pattern":{ shape: 'image', image:'/static/icons/stix2_attack_pattern_icon_tiny_round_v1.png' },
+        "intrusion-set":{ shape: 'image', image:'/static/icons/stix2_intrusion_set_icon_tiny_round_v1.png' },
+        "cource-of-action":{ shape: 'image', image:'/static/icons/stix2_course_of_action_icon_tiny_round_v1.png' },
+    }
+    return options;
+}
 
 function visOption(){
 
@@ -26,7 +59,7 @@ function visOption(){
                                 "enabled": true,
                         },
                 },
-                //"shadow": true,
+                "shadow": true,
                 "color":{
                     "background":"white",
                 },
@@ -41,14 +74,6 @@ function visOption(){
                 },
                 color:'green',
             },
-            "Malware":{
-                shape: 'icon',
-                icon:{
-                    code:'\uf188',
-                    color:'red',
-                },
-                color:'red',
-            },
         },
         "edges":{
                 "arrows": 'to',
@@ -57,7 +82,7 @@ function visOption(){
                                 "enabled": true,
                         },
                 },
-                //"shadow": true,
+                "shadow": true,
                 "smooth": {
                         //"roundness": 0.1
                 },
@@ -97,7 +122,7 @@ function visOption(){
                 "minVelocity":5,
         },
         "manipulation": {
-              "enabled": true,
+              "enabled": false,
         },
     };
     return options;

@@ -199,10 +199,21 @@ class Identity(STIXObject):
     class Meta:
         ordering = ["name"]
 
+class KillChainPhase(models.Model):
+    kill_chain_name = models.CharField(max_length=250)
+    phase_name = models.CharField(max_length=250)
+    def __str__(self):
+        return self.phase_name
+    class Meta:
+        unique_together = (("kill_chain_name", "phase_name"),)
+        ordering = ["phase_name"]
+
+
 class AttackPattern(STIXObject):
     name = models.CharField(max_length=250, unique=True)
     description = models.TextField(blank=True, null=True)
     #external_references = models.ManyToManyField(ExternalReference, blank=True)
+    kill_chain_phases = models.ManyToManyField(KillChainPhase, blank=True)
     def save(self, *args, **kwargs):
         self = _set_id(self, 'attack-pattern')
         super(AttackPattern, self).save(*args, **kwargs)
@@ -222,6 +233,7 @@ class Tool(STIXObject):
     name = models.CharField(max_length=250, unique=True)
     description = models.TextField(blank=True, null=True)
     labels = models.ManyToManyField(ToolLabel, blank=True)
+    kill_chain_phases = models.ManyToManyField(KillChainPhase, blank=True)
     def save(self, *args, **kwargs):
         self = _set_id(self, 'tool')
         super(Tool, self).save(*args, **kwargs)
@@ -241,6 +253,7 @@ class Malware(STIXObject):
     name = models.CharField(max_length=250, unique=True)
     description = models.TextField(blank=True, null=True)
     labels = models.ManyToManyField(MalwareLabel, blank=True)
+    kill_chain_phases = models.ManyToManyField(KillChainPhase, blank=True)
     def save(self, *args, **kwargs):
         self = _set_id(self, 'malware')
         super(Malware, self).save(*args, **kwargs)
@@ -392,6 +405,7 @@ class Indicator(STIXObject):
     valid_from = models.DateTimeField(blank=True, null=True)
     valid_until = models.DateTimeField(blank=True, null=True)
     pattern = models.OneToOneField(IndicatorPattern, blank=True, null=True)
+    kill_chain_phases = models.ManyToManyField(KillChainPhase, blank=True)
     def save(self, *args, **kwargs):
         self = _set_id(self, 'indicator')
         super(Indicator, self).save(*args, **kwargs)
