@@ -5,10 +5,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'STreifen'
+    'strelok_app'
 ]
 
-ROOT_URLCONF = 'STreifen.urls'
+ROOT_URLCONF = 'strelok_app.urls'
 
 DATABASES = {
     'default': {

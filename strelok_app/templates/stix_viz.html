@@ -1,0 +1,26 @@
+{% extends "stix_view.html" %}
+
+{% block jquery %}
+<link rel="stylesheet" type="text/css" href="/static/stixviz/app.css" />
+{% endblock %}
+
+{% block table %}
+<div id="tables" class="col-md-12">
+
+<div class="panel panel-default">
+<div class="panel-heading">STIX</div>
+<div class="panel-body">
+
+
+<form method="POST">{% csrf_token %}
+<button type="button" id="viz" onclick=toggleViz("stixtext") >Visualize</button>
+<input type="submit" name="timeline" value="Timeline">
+<input type="submit" name="import" value="Import">
+<textarea id="stixtext" name="input" style="height:400px;">{{stix}}</textarea>
+</form>
+
+</div><!--/.panel-body-->
+</div><!--/.panel-->
+</div><!--/tables-->
+{% endblock %}
+
