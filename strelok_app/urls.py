@@ -1,5 +1,5 @@
 from django.conf.urls import url, include
-from django.contrib import admin
+from django.contrib import admin, auth
 
 from .views.sdo import sdo_list,sdo_view, obs_view
 from .views.drs import viz_drs, data_drs
@@ -8,17 +8,17 @@ from .views.taxii import taxii_discovery, taxii_collection, taxii_get_objects
 #from .views.timeline import viz_timeline, data_timeline, timeline_view
 from .views.timeline import timeline_view
 from .views.chart import chart_view, kill_chain_view
-from .views.auth import logout_view
+#from .views.auth import logout_view
 from .tables import *
 
 from two_factor.admin import AdminSiteOTPRequired
-admin.site.__class__ = AdminSiteOTPRequired
+#admin.site.__class__ = AdminSiteOTPRequired
 
 urlpatterns = [
     url(r'', include('two_factor.urls', 'two_factor')),
-    url(r'^account/logout$', logout_view),
-    url(r'^stix/$', stix_view),
+    url(r'^account/', include('django.contrib.auth.urls')),
     url(r'^admin/', admin.site.urls),
+    url(r'^stix/$', stix_view),
     url(r'^data/report/', ReportData.as_view(), name="report_data"),
     url(r'^data/threat-actor/', ThreatActorData.as_view(), name="threatactor_data"),
     url(r'^data/identity/', IdentityData.as_view(), name="identity_data"),

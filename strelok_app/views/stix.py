@@ -10,6 +10,9 @@ import re, json, requests
 import stix2
 
 def stix2_json(request, id=None):
+    mask = True
+    if request.user.is_authenticated():
+        mask = False
     objs = []
     if not id:
         for i in STIXObjectID.objects.all():
@@ -19,7 +22,7 @@ def stix2_json(request, id=None):
     else:
         obj = STIXObject.objects.get(object_id__object_id=id)
         objs = get_related_obj(obj)
-    bundle = stix_bundle(objs)
+    bundle = stix_bundle(objs, mask=mask)
     j = json.dumps(json.loads(str(bundle)), indent=2)
     return HttpResponse(j,  content_type="application/json")
 
@@ -201,7 +204,7 @@ def stix2_db(obj):
                     l, cre = IndicatorLabel.objects.get_or_create(value=label)
                     i.labels.add(l)
             if "pattern" in obj:
-                p, cre = IndicatorPattern.objects.get_or_create(pattern=obj["pattern"])
+                p = IndicatorPattern.objects.create(pattern=obj["pattern"])
                 i.pattern = p
             if "valid_from" in obj:
                 i.valid_from = obj["valid_from"]
@@ -437,7 +440,7 @@ def stix_view(request):
                 o = get_obj_from_id(i)
                 if o:
                     objs.append(get_obj_from_id(i))
-            bundle = stix_bundle(objs)
+            bundle = stix_bundle(objs, mask=False)
             j = json.dumps(json.loads(str(bundle)), indent=2)
             return HttpResponse(j,  content_type="application/json")
         elif 'timeline' in request.POST:
@@ -480,6 +483,7 @@ def stix_view(request):
                             res = requests.get(url.strip())
                             if res:
                                 j = res.json()
+                                print(j)
                                 b = stix_filter(j, b, types=types, relation=relation)
                                 
                 elif 'parse_stix2' in request.POST:

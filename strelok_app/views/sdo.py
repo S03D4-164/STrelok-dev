@@ -445,12 +445,16 @@ def object_form_save(s, form):
     return s
 
 def sdo_view(request, id):
-    mask =True
+    mask = True
     sdo = STIXObject.objects.get(object_id__object_id=id)    
+    m = get_model_from_type(id)
     if request.user.is_authenticated():
-        m = get_model_from_type(id)
-        sdo = m.objects.get(object_id__object_id=id)
         mask = False
+        sdo = m.objects.get(object_id__object_id=id)
+    else:
+        if not m == Identity:    
+            sdo = m.objects.get(object_id__object_id=id)
+
     form = getform(id.split("--")[0], instance=sdo)
 
     objs = get_related_obj(sdo)
@@ -731,6 +735,7 @@ def sdo_view(request, id):
         "sights": sights,
         "stix":stix,
         "drform": drform,
+        "mask":mask,
     }
     if sdo.object_type.name == "indicator":
         c["pform"] = IndicatorPatternForm(instance=sdo.pattern)

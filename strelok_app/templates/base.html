@@ -37,6 +37,7 @@
 
 {% block header %}
 <nav class="navbar navbar-default">
+<div class="container-fluid">
 <ul class="nav navbar-nav">
 
 <li><a href="/">Top</a></li>
@@ -45,41 +46,39 @@
 <a class="dropdown-toggle" data-toggle="dropdown" href="#">STIX Domain Object
 <span class="caret"></span></a>
 <ul class="dropdown-menu">
-
 <li><a href="/stix/threat-actor/">Threat Actor</a></li>
-
 <li><a href="/stix/malware/">Malware</a></li>
-
 <li><a href="/stix/tool/">Tool</a></li>
-
 <li><a href="/stix/identity/">Identity</a></li>
-
 <li><a href="/stix/report/">Report</a></li>
-
 <li><a href="/stix/indicator/">Indicator</a></li>
-
 <li><a href="/stix/campaign/">Campaign</a></li>
-
 </ul>
 </li>
 
 <li><a href="/timeline/">Timeline</a></li>
-
 <li><a href="/stix/matrix/">TTP Matrix</a></li>
-
 <li><a href="/stix/">Parser</a></li>
+</ul>
 
-{% if not request.user.is_authenticated  %}
+<ul class="nav navbar-nav navbar-right">
+{% if not user.is_authenticated  %}
 <li><a href="/account/login/?next={{request.path}}">Login</a></li>
 {% else %}
+<li class="dropdown">
+<a class="dropdown-toggle" data-toggle="dropdown" href="#">User: {{user}}
+<span class="caret"></span></a>
+<ul class="dropdown-menu">
+<li><a href="/account/password_change/">Password Change</a></li>
+<li><a href="/account/two_factor/">2FA</a></li>
+<li><a href="/account/logout/?next={{request.path}}">Logout</a></li>
 {% if user.is_staff %}
-<li><a href="/stix/all.json">Export All</a></li>
 <li><a href="/admin/">Admin</a></li>
+<li><a href="/stix/all.json">Export All</a></li>
 {% endif %}
-<li><a href="/account/two_factor/">User: {{user}}</a></li>
-<li><a href="/account/logout">Logout</a></li>
 {% endif %}
 </ul>
+</div>
 </nav>
 {% endblock %}
 

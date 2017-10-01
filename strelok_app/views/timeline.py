@@ -22,6 +22,10 @@ def timeline_view(request, id=None):
     if id:
         obj = STIXObject.objects.get(object_id__object_id=id)
         objs = get_related_obj(obj)
+        if obj.object_type.name == "identity" and mask == True:
+            obj = obj.object_id.object_id
+        else:
+            obj = obj
     else:
         if not obj:
             obj = STIXObject.objects.filter(object_type__name="threat-actor")
@@ -35,14 +39,13 @@ def timeline_view(request, id=None):
     data = stix2timeline(json.loads(str(stix)))
     c = {
         "form": form,
+        "id":id,
         "obj":obj,
         "items": data["items"],
         "groups": data["groups"],
         "subgroups": data["subgroups"],
         "colors": data["colors"],
     }
-    if mask == True:
-        c["obj"] = obj.object_id
     return render(request, "timeline_viz.html", c)
 
 def find_ref(ref, stix):

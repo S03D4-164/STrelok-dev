@@ -1,17 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}
-<title>{{type|capfirst}}:
+{% block title %}<title>{{type|capfirst}}:
 {% if obj.name %}{{obj.name}}
 {% elif obj.value %}{{obj.value}}
 {% else %}{{obj.object_id.object_id}}
 {% endif %}
-</title>
-{% endblock %}
+</title>{% endblock %}
 
-{% block datatableslib %}{% endblock %}
-{% block visjslib %}{% endblock %}
-
+{% block datatableslib %}{% endblock %}{% block visjslib %}{% endblock %}
 {% block jquery %}
 <link rel="stylesheet" type="text/css" href="/static/stixviz/app.css" /> 
 <script>
@@ -107,6 +103,7 @@ $(document).ready(
 
 {% block container %}
 
+{% if user.is_authenticated %}
 {% block modal_delete %}
 <div class="modal" id="delete_form" role="dialog">
 <div class="modal-dialog"><div class="modal-content">
@@ -253,6 +250,7 @@ $(document).ready(
 </div><!--/.modal-dialog-->
 </div><!--/.modal-->
 {% endblock %}
+{% endif %}
 
 <div id="canvas-container" class="hidden">
 
@@ -288,8 +286,10 @@ $(document).ready(
 <div class="panel-heading">
 <a href="/stix/{{type}}" >{{type|capfirst}}</a>
 <a data-toggle="collapse" href="#obj_body" >▼</a>
+{% if user.is_authenticated %}
 <a class="btn btn-warning btn-xs" data-toggle="modal" href="#obj_form">Edit</a>
 <a class="btn btn-danger btn-xs" data-toggle="modal" href="#delete_form">Delete</a>
+{% endif %}
 <br>
 <h4>
 <a href="">
@@ -374,14 +374,15 @@ STIX
 </ul>
 <div class="panel panel-primary">
 <div class="panel-body">
+{% if user.is_authenticated %}
 <a class="btn btn-primary btn-xs" data-toggle="modal" href="#add_form">Add</a>
 {% if obj.object_type.name != "identity" %}
 <a class="btn btn-info btn-xs" data-toggle="modal" href="#create_form">Create</a>
 <a class="btn btn-info btn-xs" data-toggle="modal" href="#bulk_form">Bulk Create</a>
 {% endif %}
 <a class="btn btn-warning btn-xs" onclick=detachObject()>Detach</a>
-<a class="btn btn-warning btn-xs" onclick=detachObject()>Connect</a>
-
+<a class="btn btn-warning btn-xs" >Connect</a>
+{% endif %}
 <div class="tab-content">
 
 {% if obj.object_type.name == "report" %}
@@ -395,7 +396,9 @@ STIX
 {% for r in obj.object_refs.all %}
 <tr>
 <td><input class="object_id" type="checkbox" value="{{r.object_id}}"></td>
-<td><a href="/stix/{{r.object_id}}">{{r}}</td>
+<td><a href="/stix/{{r.object_id}}">
+{% if mask and "identity" in r.object_id %}{{r.object_id}}{% else %}{{r}}{% endif %}
+</td>
 </tr>
 {% endfor %}
 </tbody>
@@ -450,7 +453,7 @@ STIX
 {% ifequal o.object_id r %}
 <a href="/stix/{{o.object_id.object_id}}">
 <span class="label label-default">{{o.object_type.name}}</span><br>
-{{o.name}}</a><br>
+{% if not mask%}{{o.name}}{% else %}{{o.object_id.object_id}}{% endif %}</a><br>
 {% endifequal %}
 {% endfor %}
 {% endfor %}
@@ -493,7 +496,9 @@ STIX
 {% for s in objects %}
 {% if s.object_id == r.source_ref %}
 <span class="label label-default">{{s.object_type.name}}</span><br>
-<a href="/stix/{{s.object_id.object_id}}">{{s.name}}</a>
+<a href="/stix/{{s.object_id.object_id}}">
+{% if mask and s.object_type.name == "identity" %}{{s.object_id.object_id}}{% else %}{{s.name}}{% endif %}
+</a>
 {% endif %}
 {% endfor %}
 </td>
@@ -507,7 +512,9 @@ STIX
 {% for t in objects %}
 {% if t.object_id == r.target_ref %}
 <span class="label label-default">{{t.object_type.name}}</span><br>
-<a href="/stix/{{t.object_id.object_id}}">{{t.name}}</a>
+<a href="/stix/{{t.object_id.object_id}}">
+{% if mask and t.object_type.name == "identity" %}{{t.object_id.object_id}}{% else %}{{t.name}}{% endif %}
+</a>
 {% endif %}
 {% endfor %}
 </td>
@@ -539,7 +546,9 @@ STIX
 {% for o in objects %}
 <tr>
 <td>{{o.object_type.name}}</td>
-<td><a href="/stix/{{o.object_id.object_id}}">{{o.name}}</a></td>
+<td><a href="/stix/{{o.object_id.object_id}}">
+{% if mask and o.object_type.name == "identity" %}{{o.object_id.object_id}}{% else %}{{o.name}}{% endif %}
+</a></td>
 <td>{% for l in o.labels.all %}{{l}}<br>{% endfor %}</td>
 <!--<td>{{o.object_id.object_id}}</td>-->
 </tr>

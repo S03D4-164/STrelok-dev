@@ -216,7 +216,7 @@ def kill_chain_view(request):
         ]
     )
     zoom = 3
-    form = MatrixForm()
+    form = None
     if request.method == "POST":
         if "refresh" in request.POST:
             form = MatrixForm(request.POST)
@@ -224,6 +224,9 @@ def kill_chain_view(request):
                 tas = form.cleaned_data["threat_actor"]
                 type = form.cleaned_data["type"]
                 zoom = form.cleaned_data["zoom"]
+    if not form:
+            form = MatrixForm()
+            form.fields["type"].initial = type.values_list("id",flat=True)
     objs = STIXObject.objects.filter(
         object_type__in=type
     )
