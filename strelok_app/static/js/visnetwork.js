@@ -1,5 +1,5 @@
 function visNetwork(nodes, edges, icon){
-    console.log(icon);
+    //console.log(icon);
     var container = document.getElementById('network');
     var data = {
         nodes: nodes,
@@ -12,12 +12,18 @@ function visNetwork(nodes, edges, icon){
     var network = new vis.Network(container, data, options);
     network.on("doubleClick", function (params) {
         var object = network.getSelectedNodes();
+        //models = types;
         models = [
-            "threat-actor", 
-            "malware", 
+            "attack-pattern", 
+            "campaign",
+            "course-of-action",
             "identity",
             "indicator",
-            "campaign",
+            "intrusion-set",
+            "malware", 
+            "threat-actor", 
+            "tool", 
+            "vulnerability", 
         ];
         if (models.includes(object[0])){
             //console.log(object[0]);
@@ -38,7 +44,7 @@ function useIcon(options){
         "threat-actor":{ shape: 'image', image:'/static/icons/stix2_threat_actor_icon_tiny_round_v1.png' },
         "attack-pattern":{ shape: 'image', image:'/static/icons/stix2_attack_pattern_icon_tiny_round_v1.png' },
         "intrusion-set":{ shape: 'image', image:'/static/icons/stix2_intrusion_set_icon_tiny_round_v1.png' },
-        "cource-of-action":{ shape: 'image', image:'/static/icons/stix2_course_of_action_icon_tiny_round_v1.png' },
+        "course-of-action":{ shape: 'image', image:'/static/icons/stix2_course_of_action_icon_tiny_round_v1.png' },
     }
     return options;
 }

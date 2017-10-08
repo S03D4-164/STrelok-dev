@@ -9,12 +9,320 @@ from operator import itemgetter
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
-class InputForm(forms.Form):
-    input = forms.CharField(
+#SDO
+
+class AttackPatternForm(forms.ModelForm):
+    class Meta:
+        model = AttackPattern
+        fields = [
+            "name",
+            "kill_chain_phases",
+            "description",
+        ]
+
+identity_oid = STIXObjectID.objects.filter(
+    object_id__startswith="identity--",
+).order_by()
+
+class CampaignForm(forms.ModelForm):
+    new_alias = forms.CharField()
+    class Meta:
+        model = Campaign
+        fields = [
+            "name",
+            "created_by_ref",
+            "aliases",
+            "first_seen",
+            "last_seen",
+            "description",
+            "confidence",
+        ]
+    def __init__(self, *args, **kwargs):
+        super(CampaignForm, self).__init__(*args, **kwargs)
+        self.fields["new_alias"].required = False
+        self.fields["created_by_ref"].queryset = identity_oid
+    def clean(self):
+        c = self.cleaned_data
+        name = c["name"]
+        new = c["new_alias"]
+        aliases = list(c["aliases"].values_list("id", flat=True))
+        for n in new, name:
+            if n:
+                ca, cre = CampaignAlias.objects.get_or_create(
+                    name=n
+                )
+                aliases.append(ca.id)
+        c["aliases"] = CampaignAlias.objects.filter(
+            id__in=aliases
+        )
+        return c
+
+class CourseOfActionForm(forms.ModelForm):
+    class Meta:
+        model = CourseOfAction
+        fields = [
+            "name",
+            "description",
+        ]
+
+class IdentityForm(forms.ModelForm):
+    new_label = forms.CharField()
+    class Meta:
+        model = Identity
+        fields = [
+            "name",
+            "identity_class",
+            "sectors",
+            "labels",
+            "description",
+            "new_label",
+        ]
+    def __init__(self, *args, **kwargs):
+        super(IdentityForm, self).__init__(*args, **kwargs)
+        self.fields["identity_class"].initial = "organization"
+        self.fields["new_label"].required = False
+    def clean(self):
+        c = self.cleaned_data
+        #name = c["name"]
+        new = c["new_label"]
+        labels = list(c["labels"].values_list("id", flat=True))
+        if new:
+            il, cre = IdentityLabel.objects.get_or_create(
+                value=new
+            )
+            labels.append(il.id)
+        c["labels"] = IdentityLabel.objects.filter(
+            id__in=labels
+        )
+        return c
+
+class IndicatorForm(forms.ModelForm):
+    observable = forms.CharField(
         widget=forms.Textarea(
-            attrs={'style':'height:200px;'}
+            attrs={'style':'height:100px;'}
         )
     )
+    class Meta:
+        model = Indicator
+        fields = [
+            "name",
+            "labels",
+            "description",
+            "valid_from",
+            "valid_until",
+            #"pattern",
+        ]
+    def __init__(self, *args, **kwargs):
+        super(IndicatorForm, self).__init__(*args, **kwargs)
+        self.fields["observable"].required = False
+
+class IntrusionSetForm(forms.ModelForm):
+    new_alias = forms.CharField()
+    class Meta:
+        model = IntrusionSet
+        fields = [
+            "name",
+            "description",
+            "aliases",
+            "first_seen",
+            "last_seen",
+        ]
+    def __init__(self, *args, **kwargs):
+        super(IntrusionSetForm, self).__init__(*args, **kwargs)
+        self.fields["new_alias"].required = False
+    def clean(self):
+        c = self.cleaned_data
+        name = c["name"]
+        new = c["new_alias"]
+        aliases = list(c["aliases"].values_list("id", flat=True))
+        for n in new, name:
+            if n:
+                ia, cre = IntrusionSetAlias.objects.get_or_create(
+                    name=n
+                )
+                aliases.append(ia.id)
+        c["aliases"] = IntrusionSetAlias.objects.filter(
+            id__in=aliases
+        )
+        return c
+
+
+class MalwareForm(forms.ModelForm):
+    class Meta:
+        model = Malware
+        fields = [
+            "name",
+            "labels",
+            "kill_chain_phases",
+            "description",
+        ]
+
+def create_obs_from_line(line):
+    o = None
+    pattern = None
+    type = line.strip().split(":")[0]
+    value = ":".join(line.strip().split(":")[1:]).strip()
+    t = ObservableObjectType.objects.filter(name=type)
+    if t.count() == 1:
+        t = t[0]
+        if t.model_name:
+            m = apps.get_model(t._meta.app_label, t.model_name)
+            if t.name == "file":
+                o, cre = m.objects.get_or_create(
+                    type = t,
+                    name = value
+                )
+                pattern = type + ":name="+ value
+            else:
+                o, cre = m.objects.get_or_create(
+                    type = t,
+                    value = value
+                )
+                pattern = type + ":value=" + value
+    return o, pattern
+
+class ObservedDataForm(forms.ModelForm):
+    new_observable = forms.CharField(
+        widget=forms.Textarea(
+            attrs={'style':'height:100px;'}
+        )
+    )
+    class Meta:
+        model = ObservedData
+        fields = [
+            "first_observed",
+            "last_observed",
+            "number_observed",
+            "observable_objects",
+        ]
+    def __init__(self, *args, **kwargs):
+        super(ObservedDataForm, self).__init__(*args, **kwargs)
+        self.fields["new_observable"].required = False
+        self.fields["observable_objects"].required = False
+        self.fields["number_observed"].initial = 1
+    def clean(self):
+        c = self.cleaned_data
+        new = c["new_observable"]
+        obs = list(c["observable_objects"].values_list("id", flat=True))
+        for line in new.split("\n"):
+            if line:
+                o, p = create_obs_from_line(line)
+                if o:
+                    obs.append(o.id)
+        c["observable_objects"] = ObservableObject.objects.filter(
+            id__in=obs
+        )
+        return c
+
+class ReportForm(forms.ModelForm):
+    class Meta:
+        model = Report
+        fields = [
+            "name",
+            "created_by_ref",
+            "published",
+            "labels",
+            "description",
+            #"object_refs",
+        ]
+        widgets = {
+            #"labels":forms.CheckboxSelectMultiple(),
+            #"object_refs":forms.CheckboxSelectMultiple(),
+        }
+    def __init__(self, *args, **kwargs):
+        super(ReportForm, self).__init__(*args, **kwargs)
+        self.fields["created_by_ref"].choices = object_choices(
+            ids=identity_oid,
+            #ids=STIXObjectID.objects.filter(
+            #    object_id__startswith="identity--",
+            #),
+            dummy=True
+        )
+
+class ThreatActorForm(forms.ModelForm):
+    new_alias = forms.CharField()
+    class Meta:
+        model = ThreatActor
+        fields = [
+            "name",
+            "labels",
+            "aliases",
+            "description",
+            "new_alias",
+        ]
+    def __init__(self, *args, **kwargs):
+        super(ThreatActorForm, self).__init__(*args, **kwargs)
+        self.fields["new_alias"].required = False
+        self.fields["labels"].required = True
+    def clean(self):
+        c = self.cleaned_data
+        name = c["name"]
+        new = c["new_alias"]
+        aliases = list(c["aliases"].values_list("id", flat=True))
+        for n in new, name:
+            if n:
+                ia, cre = ThreatActorAlias.objects.get_or_create(
+                    name=n
+                )
+                aliases.append(ia.id)
+        c["aliases"] = ThreatActorAlias.objects.filter(
+            id__in=aliases
+        )
+        return c
+
+class ToolForm(forms.ModelForm):
+    class Meta:
+        model = Tool
+        fields = [
+            "name",
+            "labels",
+            "kill_chain_phases",
+            "description",
+        ]
+    def __init__(self, *args, **kwargs):
+        super(ToolForm, self).__init__(*args, **kwargs)
+        self.fields["labels"].required = True
+
+class VulnerabilityForm(forms.ModelForm):
+    class Meta:
+        model = Vulnerability
+        fields = [
+            "name",
+            "description",
+        ]
+
+# SRO
+class RelationshipForm(forms.ModelForm):
+    class Meta:
+        model = Relationship
+        fields = [
+            "source_ref",
+            "relationship_type",
+            "target_ref",
+            "description",
+        ]
+    def __init__(self, *args, **kwargs):
+        super(RelationshipForm, self).__init__(*args, **kwargs)
+        exclude_rel = STIXObjectID.objects.exclude(
+                Q(object_id__startswith="relationship--")|\
+                Q(object_id__startswith="sighting--")|\
+                Q(object_id__startswith="observed-data--")|\
+                Q(object_id__startswith="report--")
+        )
+        self.fields["source_ref"].queryset = exclude_rel
+        self.fields["target_ref"].queryset = exclude_rel 
+    def clean(self):
+        c = self.cleaned_data
+        v = DefinedRelationship.objects.filter(
+            type=c["relationship_type"],
+            source__name=str(c["source_ref"].object_id).split("--")[0],
+            target__name=str(c["target_ref"].object_id).split("--")[0],
+        )
+        if not v:
+            raise ValidationError("Invalid Relationship")
+        else:
+            return self.cleaned_data
+
 
 class TimelineForm(forms.Form):
     plot = forms.ChoiceField(choices=(
@@ -45,44 +353,6 @@ class TimelineForm(forms.Form):
         self.fields["stack_subgroups"].required = False
         self.fields["show_minor_labels"].required = False
 
-class RelationshipForm(forms.ModelForm):
-    class Meta:
-        model = Relationship
-        fields = [
-            "source_ref",
-            "relationship_type",
-            "target_ref",
-            "description",
-        ]
-    def __init__(self, *args, **kwargs):
-        super(RelationshipForm, self).__init__(*args, **kwargs)
-        exclude_rel = STIXObjectID.objects.exclude(
-                Q(object_id__startswith="relationship--")|\
-                Q(object_id__startswith="sighting--")|\
-                Q(object_id__startswith="report--")
-        )
-        self.fields["source_ref"].queryset = exclude_rel
-        self.fields["target_ref"].queryset = exclude_rel 
-
-class CampaignForm(forms.ModelForm):
-    new_alias = forms.CharField()
-    class Meta:
-        model = Campaign
-        fields = [
-            "name",
-            "created_by_ref",
-            "aliases",
-            "first_seen",
-            "last_seen",
-            "description",
-            "confidence",
-        ]
-    def __init__(self, *args, **kwargs):
-        super(CampaignForm, self).__init__(*args, **kwargs)
-        self.fields["new_alias"].required = False
-        self.fields["created_by_ref"].queryset = STIXObjectID.objects.filter(
-                object_id__startswith="identity--",
-        ).order_by()
 
 class SightingForm(forms.ModelForm):
     observable = forms.CharField(
@@ -98,36 +368,51 @@ class SightingForm(forms.ModelForm):
     class Meta:
         model = Sighting
         fields = [
-            #"where_sighted_refs",
+            "where_sighted_refs",
             "sighting_of_ref",
             #"sighting_of",
             "first_seen",
             "last_seen",
-            #"description",
+            "observed_data_refs",
         ]
     def __init__(self, *args, **kwargs):
         super(SightingForm, self).__init__(*args, **kwargs)
         schoices = object_choices(
             ids = STIXObjectID.objects.filter(
                 Q(object_id__startswith="threat-actor--")\
+                |Q(object_id__startswith="indicator--")\
                 |Q(object_id__startswith="malware--")\
-                |Q(object_id__startswith="attack-pattern--")\
-                |Q(object_id__startswith="campaign--")\
-                |Q(object_id__startswith="intrusion-set--")\
                 |Q(object_id__startswith="tool--")\
+                |Q(object_id__startswith="campaign--")\
+                |Q(object_id__startswith="attack-pattern--")\
+                |Q(object_id__startswith="intrusion-set--")\
             )
         )
         self.fields["sighting_of_ref"].choices = schoices
+        self.fields["where_sighted_refs"].choices = object_choices(
+            ids=identity_oid
+            #ids=STIXObjectID.objects.filter(
+            #    object_id__startswith="identity--",
+            #),
+        )
+        self.fields["observable"].required = False
         """
         self.fields["sighting_of"].choices = schoices
-        self.fields["where_sighted_refs"].choices = object_choices(
-            ids=STIXObjectID.objects.filter(
-                object_id__startswith="identity--",
-            ),
-        )
         self.fields["where_sighted_refs"].required = False
         """
-        self.fields["observable"].required = False
+
+class MalwareLabelForm(forms.ModelForm):
+    class Meta:
+        model = Malware
+        fields = [
+            "labels",
+        ]
+
+class ReportLabelForm(forms.Form):
+    label = forms.ModelMultipleChoiceField(
+        queryset=ReportLabel.objects.all(),
+        widget=forms.CheckboxSelectMultiple(attrs={"checked":""})
+    )
 
 class ThreatActorLabelForm(forms.ModelForm):
     #new_label = forms.CharField()
@@ -136,6 +421,80 @@ class ThreatActorLabelForm(forms.ModelForm):
         fields = [
             "labels",
         ]
+
+class ToolLabelForm(forms.ModelForm):
+    class Meta:
+        model = Tool
+        fields = [
+            "labels",
+        ]
+
+class IdentityClassForm(forms.ModelForm):
+    #new_label = forms.CharField()
+    class Meta:
+        model = Identity
+        fields = [
+            "identity_class",
+        ]
+
+class ReportRefForm(forms.ModelForm):
+    class Meta:
+        model = Report
+        fields = [
+            "object_refs",
+        ]
+        widgets = {
+            "object_refs":forms.CheckboxSelectMultiple(),
+        }
+
+class DefinedRelationshipForm(forms.Form):
+    relation = forms.ModelChoiceField(
+        queryset=DefinedRelationship.objects.all()
+    )
+
+class SelectObjectForm(forms.Form):
+    type = forms.ModelChoiceField(
+        queryset=STIXObjectType.objects.filter()
+    )
+    def __init__(self, *args, **kwargs):
+        super(SelectObjectForm, self).__init__(*args, **kwargs)
+        self.fields["type"].required = False
+
+class AddObjectForm(forms.Form):
+    relation = forms.ModelChoiceField(
+        queryset=DefinedRelationship.objects.all()
+    )
+    objects = forms.ModelMultipleChoiceField(
+        queryset=STIXObjectID.objects.all()
+    )
+    def __init__(self, *args, **kwargs):
+        super(AddObjectForm, self).__init__(*args, **kwargs)
+        self.fields["objects"].choices = object_choices()
+        self.fields["relation"].required = False
+
+class TypeSelectForm(forms.Form):
+    icon = forms.BooleanField(initial=True)
+    types = forms.ModelMultipleChoiceField(
+        queryset=STIXObjectType.objects.all(),
+        widget=forms.CheckboxSelectMultiple(attrs={"checked":""})
+    )
+    relation = forms.ModelMultipleChoiceField(
+        queryset=RelationshipType.objects.all(),
+        widget=forms.CheckboxSelectMultiple(attrs={"checked":""})
+    )
+    def __init__(self, *args, **kwargs):
+        super(TypeSelectForm, self).__init__(*args, **kwargs)
+        self.fields["types"].required = False
+        self.fields["relation"].required = False
+        self.fields["icon"].required = False
+
+
+class InputForm(forms.Form):
+    input = forms.CharField(
+        widget=forms.Textarea(
+            attrs={'style':'height:200px;'}
+        )
+    )
 
 has_killchain = [                          
     "attack-pattern",                            
@@ -171,116 +530,6 @@ class MatrixForm(forms.Form):
         self.fields["type"].required = False
 
 
-class ThreatActorForm(forms.ModelForm):
-    new_alias = forms.CharField()
-    class Meta:
-        model = ThreatActor
-        fields = [
-            "name",
-            "labels",
-            "aliases",
-            "description",
-            "new_alias",
-        ]
-        #widgets = {
-        #    "labels":forms.CheckboxSelectMultiple(),
-        #}
-    def __init__(self, *args, **kwargs):
-        super(ThreatActorForm, self).__init__(*args, **kwargs)
-        self.fields["new_alias"].required = False
-
-class MalwareLabelForm(forms.ModelForm):
-    class Meta:
-        model = Malware
-        fields = [
-            "labels",
-        ]
-
-class MalwareForm(forms.ModelForm):
-    class Meta:
-        model = Malware
-        fields = [
-            "name",
-            "labels",
-            "kill_chain_phases",
-            "description",
-        ]
-
-class ToolLabelForm(forms.ModelForm):
-    class Meta:
-        model = Tool
-        fields = [
-            "labels",
-        ]
-
-class ToolForm(forms.ModelForm):
-    class Meta:
-        model = Tool
-        fields = [
-            "name",
-            "labels",
-            "kill_chain_phases",
-            "description",
-        ]
-
-class VulnerabilityForm(forms.ModelForm):
-    class Meta:
-        model = Vulnerability
-        fields = [
-            "name",
-            "description",
-        ]
-
-
-class AttackPatternForm(forms.ModelForm):
-    class Meta:
-        model = AttackPattern
-        fields = [
-            "name",
-            "kill_chain_phases",
-            "description",
-        ]
-
-class IdentityClassForm(forms.ModelForm):
-    #new_label = forms.CharField()
-    class Meta:
-        model = Identity
-        fields = [
-            "identity_class",
-        ]
-
-class IdentityForm(forms.ModelForm):
-    new_label = forms.CharField()
-    class Meta:
-        model = Identity
-        fields = [
-            "name",
-            "identity_class",
-            "sectors",
-            "labels",
-            "description",
-            "new_label",
-        ]
-    def __init__(self, *args, **kwargs):
-        super(IdentityForm, self).__init__(*args, **kwargs)
-        self.fields["identity_class"].initial = "organization"
-        self.fields["new_label"].required = False
-
-
-class DefinedRelationshipForm(forms.Form):
-    relation = forms.ModelChoiceField(
-        queryset=DefinedRelationship.objects.all()
-    )
-
-class SelectObjectForm(forms.Form):
-    type = forms.ModelChoiceField(
-        queryset=STIXObjectType.objects.filter()
-    )
-    def __init__(self, *args, **kwargs):
-        super(SelectObjectForm, self).__init__(*args, **kwargs)
-        self.fields["type"].required = False
-
-
 def get_related_obj(sdo):
     objects = []
     ids = [sdo.object_id.id]
@@ -293,6 +542,7 @@ def get_related_obj(sdo):
         sights = Sighting.objects.filter(id__in=sdo.object_refs.all())
     elif sdo.object_type.name == "sighting":
         sights = Sighting.objects.filter(object_id__id__in=ids)
+        ids += sdo.observed_data_refs.all().values_list("id",flat=True)
     elif sdo.object_type.name == "relationship":
         rels = Relationship.objects.filter(object_id_id__in=ids)
     else:
@@ -327,7 +577,6 @@ def get_related_obj(sdo):
             objects.append(obj)
     #print(objects)
     return objects
-
 
 def object_choices(
         #ids=STIXObjectID.objects.all(),
@@ -373,93 +622,6 @@ def object_choices(
         choices.sort(key=itemgetter(1))
     return choices
 
-class AddObjectForm(forms.Form):
-    relation = forms.ModelChoiceField(
-        queryset=RelationshipType.objects.all()
-    )
-    objects = forms.ModelMultipleChoiceField(
-        queryset=STIXObjectID.objects.all()
-    )
-    def __init__(self, *args, **kwargs):
-        super(AddObjectForm, self).__init__(*args, **kwargs)
-        self.fields["objects"].choices = object_choices()
-        self.fields["relation"].required = False
-
-class ReportLabelForm(forms.Form):
-    label = forms.ModelMultipleChoiceField(
-        queryset=ReportLabel.objects.all(),
-        widget=forms.CheckboxSelectMultiple(attrs={"checked":""})
-    )
-
-class ReportRefForm(forms.ModelForm):
-    class Meta:
-        model = Report
-        fields = [
-            "object_refs",
-        ]
-        widgets = {
-            "object_refs":forms.CheckboxSelectMultiple(),
-        }
-
-class ReportForm(forms.ModelForm):
-    class Meta:
-        model = Report
-        fields = [
-            "name",
-            "created_by_ref",
-            "published",
-            "labels",
-            "description",
-            #"object_refs",
-        ]
-        widgets = {
-            #"labels":forms.CheckboxSelectMultiple(),
-            #"object_refs":forms.CheckboxSelectMultiple(),
-        }
-    def __init__(self, *args, **kwargs):
-        super(ReportForm, self).__init__(*args, **kwargs)
-        self.fields["created_by_ref"].choices = object_choices(
-            ids=STIXObjectID.objects.filter(
-                object_id__startswith="identity--",
-            ),dummy=True
-        )
-
-class TypeSelectForm(forms.Form):
-    icon = forms.BooleanField(initial=True)
-    types = forms.ModelMultipleChoiceField(
-        queryset=STIXObjectType.objects.all(),
-        widget=forms.CheckboxSelectMultiple(attrs={"checked":""})
-    )
-    relation = forms.ModelMultipleChoiceField(
-        queryset=RelationshipType.objects.all(),
-        widget=forms.CheckboxSelectMultiple(attrs={"checked":""})
-    )
-    def __init__(self, *args, **kwargs):
-        super(TypeSelectForm, self).__init__(*args, **kwargs)
-        self.fields["types"].required = False
-        self.fields["relation"].required = False
-        self.fields["icon"].required = False
-
-class IndicatorForm(forms.ModelForm):
-    observable = forms.CharField(
-        widget=forms.Textarea(
-            attrs={'style':'height:100px;'}
-        )
-    )
-    class Meta:
-        model = Indicator
-        fields = [
-            "name",
-            "labels",
-            "description",
-            "valid_from",
-            "valid_until",
-            #"pattern",
-        ]
-    def __init__(self, *args, **kwargs):
-        super(IndicatorForm, self).__init__(*args, **kwargs)
-        self.fields["observable"].required = False
-
 class IndicatorPatternForm(forms.ModelForm):
     generate_pattern = forms.BooleanField()
     new_observable = forms.CharField(
@@ -479,7 +641,6 @@ class IndicatorPatternForm(forms.ModelForm):
         self.fields["new_observable"].required = False
         self.fields["observable"].required = False
         self.fields["pattern"].required = False
-
 
 class SelectObservableForm(forms.Form):
     label = forms.ModelChoiceField(
@@ -517,3 +678,4 @@ class DomainNameForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(DomainNameForm, self).__init__(*args, **kwargs)
         self.fields["new_refs"].required = False
+

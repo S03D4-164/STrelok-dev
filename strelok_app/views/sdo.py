@@ -183,43 +183,13 @@ def sdo_list(request, type):
             form = getform(type, request=request)
             if form.is_valid():
                 s = form.save()
-                s = object_form_save(s, form)
-                """
-                if s.object_type.name == "threat-actor":
-                    alias = form.cleaned_data["new_alias"]
-                    for n in s.name, alias:
-                        if n:
-                            ta, created = ThreatActorAlias.objects.get_or_create(
-                                name = n
-                            )
-                            s.aliases.add(ta)
-                            s.save
-                elif s.object_type.name == "campaign":
-                    alias = form.cleaned_data["new_alias"]
-                    for n in s.name, alias:
-                        if n:
-                            ta, created = CampaignAlias.objects.get_or_create(
-                                name = n
-                            )
-                            s.aliases.add(ta)
-                            s.save
-                elif s.object_type.name == "identity":
-                    label = form.cleaned_data["new_label"]
-                    if label:
-                        l, cre = IdentityLabel.objects.get_or_create(
-                            value=label
-                        )
-                        s.labels.add(l)
-                        s.save
-                elif s.object_type.name == "indicator":
-                    observable = form.cleaned_data["observable"]
-                    if observable:
-                        p = obs2pattern(observable)
-                        s.pattern = p
-                        s.save()
-                """
+                #s = object_form_save(s, form)
                 messages.add_message(
-                    request, messages.SUCCESS, 'Created -> '+s.name,
+                    request, messages.SUCCESS, 'Created -> '+str(s),
+                )
+            else:
+                messages.add_message(
+                    request, messages.ERROR, 'Creation Failed',
                 )
         elif "create_bulk" in request.POST:
             bulkform = InputForm(request.POST)
@@ -337,24 +307,30 @@ def getform(type, request=None, instance=None, report=None):
     if request:
         if request.method == 'POST':
             post = request.POST
-    if type == "identity":
-        return IdentityForm(post,instance=instance)
-    elif type == "attack-pattern":
+    if type == "attack-pattern":
         return AttackPatternForm(post,instance=instance)
-    elif type == "report":
-        return ReportForm(post,instance=instance)
+    elif type == "campaign":
+        return CampaignForm(post,instance=instance)
+    elif type == "course-of-action":
+        return CourseOfActionForm(post,instance=instance)
+    elif type == "identity":
+        return IdentityForm(post,instance=instance)
+    elif type == "intrusion-set":
+        return IntrusionSetForm(post,instance=instance)
     elif type == "malware":
         return MalwareForm(post,instance=instance)
+    elif type == "observed-data":
+        return ObservedDataForm(post,instance=instance)
+    elif type == "report":
+        return ReportForm(post,instance=instance)
+    elif type == "threat-actor":
+        return ThreatActorForm(post,instance=instance)
     elif type == "tool":
         return ToolForm(post,instance=instance)
     elif type == "vulnerability":
         return VulnerabilityForm(post,instance=instance)
-    elif type == "threat-actor":
-        return ThreatActorForm(post,instance=instance)
     elif type == "indicator":
         return IndicatorForm(post,instance=instance)
-    elif type == "campaign":
-        return CampaignForm(post,instance=instance)
     elif type == "domain-name":
         return DomainNameForm(post,instance=instance)
     elif type == "relationship":
@@ -363,9 +339,10 @@ def getform(type, request=None, instance=None, report=None):
             # exclude SRO
             choices = object_choices(
                 ids=report.object_refs.all().exclude(
-                    object_id__startswith = 'relationship'
-                ).exclude(
-                    object_id__startswith = 'sighting'
+                Q(object_id__startswith="relationship--")|\
+                Q(object_id__startswith="sighting--")|\
+                Q(object_id__startswith="observed-data--")|\
+                Q(object_id__startswith="report--")
                 )
             )
             form.fields["source_ref"].choices = choices
@@ -402,15 +379,19 @@ def add_object_refs(report, oid):
         report.object_refs.add(r.sighting_of_ref)
         for wsr in r.where_sighted_of_refs.all():
             report.object_refs.add(wsr)
+        for od in r.observed_data_refs.all():
+            report.object_refs.add(od)
     return report
 
 def get_model_from_type(type):
     name = ""
-    for i in type.split("-")[0:2]:
+    t = type.split("--")[0]
+    for i in t.split("-"):
         name += i.capitalize()
     m = getattr(mymodels, name)
     return m
 
+"""
 def object_form_save(s, form):
     if s.object_type.name == "threat-actor":
         n = form.cleaned_data["new_alias"]
@@ -419,6 +400,12 @@ def object_form_save(s, form):
                 name=n
             )
             s.aliases.add(ta)
+            s.save()
+    elif s.object_type.name == "indicator":
+        observable = form.cleaned_data["observable"]
+        if observable:
+            p = obs2pattern(observable)
+            s.pattern = p
             s.save()
     elif s.object_type.name == "identity":
         l = form.cleaned_data["new_label"]
@@ -436,13 +423,8 @@ def object_form_save(s, form):
             )
             s.aliases.add(ca)
             s.save()
-    elif s.object_type.name == "indicator":
-        observable = form.cleaned_data["observable"]
-        if observable:
-            p = obs2pattern(observable)
-            s.pattern = p
-            s.save()
     return s
+"""
 
 def sdo_view(request, id):
     mask = True
@@ -454,15 +436,30 @@ def sdo_view(request, id):
     else:
         if not m == Identity:    
             sdo = m.objects.get(object_id__object_id=id)
-
     form = getform(id.split("--")[0], instance=sdo)
 
-    objs = get_related_obj(sdo)
-    #print(objs)
-    stix = stix_bundle(objs, mask=mask)
     rels = []
     sights = []
     objects = []
+    observables = []
+
+    objs = get_related_obj(sdo)
+    stix = {}
+    try:
+        stix = stix_bundle(objs, mask=mask)
+        """
+        if "objects" in stix:
+            for o in stix["objects"]:
+                if o.type == "relationship":
+                    rels.append(o)
+                elif o.type == "sighting":
+                    sights.append(o)
+                else:
+                    objects.append(o)
+        """
+    except:
+        pass
+
     for o in objs:
         if o.object_type.name == "relationship":
             rels.append(o)
@@ -472,19 +469,18 @@ def sdo_view(request, id):
             objects.append(o)
 
     drs = DefinedRelationship.objects.filter(
-        source=sdo.object_type
+        Q(source=sdo.object_type)|\
+        Q(target=sdo.object_type)
     )
  
     drform = DefinedRelationshipForm()
     drform.fields["relation"].queryset = drs
-    #print(drform)
 
     soform = SelectObjectForm()
     if not sdo.object_type.name == "report":
         soform.fields["type"].queryset = STIXObjectType.objects.filter(
             id__in=drs.values("target")
         )
-    #print(soform)
 
     selected = None
     coform = None
@@ -493,15 +489,16 @@ def sdo_view(request, id):
     if sdo.object_type.name == "identity":
         aoform = SightingForm()
     elif not sdo.object_type.name == "report":
-        aoform.fields["relation"].queryset = RelationshipType.objects.filter(
-          id__in=drs.values("type")
-        )
+        aoform.fields["relation"].queryset = drs
+        #aoform.fields["relation"].queryset = RelationshipType.objects.filter(
+        #  id__in=drs.values("type")
+        #)
         #tgt = STIXObject.objects.filter(object_type__in=drs.values("target"))
         aoform.fields["objects"].choices = object_choices(
             #ids=STIXObjectID.objects.filter(id__in=tgt)
             ids=[]
         )
-        aoform.fields["relation"].required = True
+        #aoform.fields["relation"].required = True
 
     if request.method == "POST":
         print(request.POST)
@@ -509,33 +506,7 @@ def sdo_view(request, id):
             form = getform(id.split("--")[0],request=request,instance=sdo)
             if form.is_valid():
                 s = form.save()
-                s = object_form_save(s, form)
-                """
-                if s.object_type.name == "threat-actor":
-                    n = form.cleaned_data["new_alias"]
-                    if n:
-                        ta, cre = ThreatActorAlias.objects.get_or_create(
-                            name=n
-                        )
-                        s.aliases.add(ta)
-                        s.save()
-                elif s.object_type.name == "identity":
-                    l = form.cleaned_data["new_label"]
-                    if l:
-                        il, cre = IdentityLabel.objects.get_or_create(
-                            value=l
-                        )
-                        s.labels.add(il)
-                        s.save()
-                elif s.object_type.name == "campaign":
-                    n = form.cleaned_data["new_alias"]
-                    if n:
-                        ca, cre = CampaignAlias.objects.get_or_create(
-                            name=n
-                        )
-                        s.aliases.add(ca)
-                        s.save()
-                """
+                #s = object_form_save(s, form)
                 messages.add_message(request, messages.SUCCESS, 'Updated.')
                 return redirect("/stix/"+id)
         elif 'detach[]' in request.POST:
@@ -557,14 +528,11 @@ def sdo_view(request, id):
             else:
                 for i in STIXObjectID.objects.filter(object_id__in=dlist):
                     #d = get_obj_from_id(i)
-                    print(i)
                     i.delete()
             messages.add_message(request, messages.SUCCESS, 'Removed.')
-            return redirect("/stix/"+id)
+            #return redirect("/stix/"+id)
         elif 'delete' in request.POST:
-            name = sdo.name
-            #so = STIXObject.objects.get(id=sdo.id)
-            #so.delete()
+            name = str(sdo)
             sdo.delete()
             messages.add_message(
                 request, messages.SUCCESS,
@@ -586,8 +554,8 @@ def sdo_view(request, id):
                         property = obform.cleaned_data["property"]
                         label = obform.cleaned_data["label"]
                         bulk_create_indicator(label,property,input,src=sdo)
-        elif 'select' in request.POST:
-            sotid = request.POST.get('select')
+        elif 'select_type' in request.POST:
+            sotid = request.POST.get('select_type')
             if sotid:
                 sot = STIXObjectType.objects.get(id=sotid)
                 selected = sot.name
@@ -595,35 +563,56 @@ def sdo_view(request, id):
                 #coform = _object_form(selected, report=report)
                 coform = getform(selected)
                 aoform.fields["objects"].choices = object_choices(
-                    ids=STIXObjectID.objects.filter(object_id__startswith=selected.split("--")[0])
+                    ids=STIXObjectID.objects.filter(
+                        object_id__startswith=selected.split("--")[0]
+                    )
                 )
                 #aoform.fields["objects"].queryset = STIXObjectID.objects.filter(
                 #    object_id__startswith=selected.split("--")[0]
                 #)
         elif 'select_dr' in request.POST:
             dr = request.POST.get('select_dr')
+            #print(dr)
             if dr:
                 drs = DefinedRelationship.objects.get(id=dr)
-                coform = getform(drs.target.name)
-                #print(coform)
-        elif 'select_rel' in request.POST:
-            rt = request.POST.get('select_rel')
-            if rt:
-                #r = RelationshipType.objects.get(id=rid)
-                drs = DefinedRelationship.objects.filter(
-                    source=sdo.object_type,
-                    type__id=rt,
-                )
-                t = STIXObjectType.objects.filter(id__in=drs.values_list("target", flat=True))
+                if drs.source.name == sdo.object_type.name:
+                    coform = getform(drs.target.name)
+                else:
+                    coform = getform(drs.source.name)
+        elif 'select_add' in request.POST:
+            dr = request.POST.get('select_add')
+            if dr:
+                drs = DefinedRelationship.objects.get(id=dr)
+                t = []
+                if drs.source.name == sdo.object_type.name:
+                    t = drs.target
+                else:
+                    t = drs.source
                 so = STIXObject.objects.filter(
-                    object_type__in=t,
+                    object_type=t,
                 )
-                #print(so)
                 aoform.fields["objects"].choices = object_choices(
                     ids=STIXObjectID.objects.filter(
                         id__in=so.values_list("object_id__id",flat=True)
                     )
                 )
+            """
+            rt = request.POST.get('select_rel')
+            if rt:
+                #r = RelationshipType.objects.get(id=rid)
+                drs = DefinedRelationship.objects.filter(
+                    type__id=rt,
+                )
+                t = []
+                if drs.filter(source=sdo.object_type):
+                    t = STIXObjectType.objects.filter(
+                        id__in=drs.values_list("target", flat=True)
+                    )
+                else:
+                    t = STIXObjectType.objects.filter(
+                        id__in=drs.values_list("source", flat=True)
+                    )
+            """
         elif 'create_obj' in request.POST:
             saved = None
             if sdo.object_type.name == "report":
@@ -635,7 +624,7 @@ def sdo_view(request, id):
                 if coform.is_valid():
                     saved = coform.save()
                     #if sot.name == "indicator":
-                    saved = object_form_save(saved, coform)
+                    #saved = object_form_save(saved, coform)
                     report = add_object_refs(sdo, saved.object_id)
                     report.save()
             else:
@@ -645,7 +634,7 @@ def sdo_view(request, id):
                     coform = getform(drs.target.name, request=request)
                     if coform.is_valid():
                         saved = coform.save()
-                        saved = object_form_save(saved, coform)
+                        #saved = object_form_save(saved, coform)
                         if saved:
                             Relationship.objects.get_or_create(
                                 source_ref=sdo.object_id,
@@ -679,9 +668,11 @@ def sdo_view(request, id):
                 return redirect("/stix/"+id)
         elif 'add_obj' in request.POST:
             aoform = AddObjectForm(request.POST)
+            #print(aoform)
             if aoform.is_valid():
                 refs = aoform.cleaned_data["objects"]
                 rel = aoform.cleaned_data["relation"]
+                #print(rel)
                 for ref in refs:
                     if sdo.object_type.name == "report":
                         sdo.object_refs.add(ref)
@@ -695,13 +686,19 @@ def sdo_view(request, id):
                                 *s[0].where_sighted_refs
                         )
                         sdo.save()
-                            
                     else:
-                        Relationship.objects.get_or_create(
-                            source_ref=sdo.object_id,
-                            relationship_type=rel,
-                            target_ref=ref,
-                        )
+                        if rel.source == sdo.object_type:
+                            Relationship.objects.get_or_create(
+                                source_ref=sdo.object_id,
+                                relationship_type=rel.relationship_type,
+                                target_ref=ref,
+                            )
+                        else:
+                            Relationship.objects.get_or_create(
+                                target_ref=sdo.object_id,
+                                relationship_type=rel.type,
+                                source_ref=ref,
+                            )
                 #report.save()
                 messages.add_message(
                     request, messages.SUCCESS, 'Updated.'

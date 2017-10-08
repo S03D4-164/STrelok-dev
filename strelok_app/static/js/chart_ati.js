@@ -56,7 +56,7 @@ chart = new Highcharts.chart({
                                 //'name':name,
                                 //'categories':categories,
                                 'data':data,
-                                'type':'column',
+                                'type':'pie',
                             }
                         }
                         setChart(options);
@@ -71,7 +71,7 @@ chart = new Highcharts.chart({
     },
     series: [{
         colorByPoint: true,
-        type: 'column',
+        type: 'pie',
         name: name,
         data: data,
     }]

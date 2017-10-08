@@ -35,7 +35,8 @@
 <form method="POST">{% csrf_token %}
 <button class="btn btn-default" type="button" id="viz" onclick=toggleViz("stixtext") >Visualize</button>
 <input class="btn btn-default" type="submit" name="timeline" value="Timeline">
-<a class="btn btn-warning" data-toggle="modal" href="#import_form">Import</a>
+<!--a class="btn btn-warning" data-toggle="modal" href="#import_form">Import</a-->
+<input class="btn btn-md btn-warning" type="submit" name="import" value="Import">
 <textarea id="stixtext" name="input" style="height:400px;">{{stix}}</textarea>
 </form>
 

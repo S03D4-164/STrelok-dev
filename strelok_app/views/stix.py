@@ -99,7 +99,7 @@ def sight2db(sight, objs):
     return None
 
 def rep2db(rep, objs):
-    print(rep)
+    #print(rep)
     r = None
     if "name" in rep:
         if rep["name"]:
@@ -125,6 +125,22 @@ def rep2db(rep, objs):
         r.save()
     return r
 
+def _stix2property(so, obj):            
+    if "description" in obj:
+        so.description = obj["description"]
+    if "kill_chain_phases" in obj:
+        for kcp in obj["kill_chain_phases"]:
+            k, cre = KillChainPhase.objects.get_or_create(
+                kill_chain_name=kcp["kill_chain_name"],
+                phase_name=kcp["phase_name"],
+            )
+            so.kill_chain_phases.add(k)
+    if "first_seen" in obj:
+        so.first_seen = obj["first_seen"]
+    if "last_seen" in obj:
+        so.last_seen = obj["last_seen"]
+    return so
+
 def stix2_db(obj):
     if "type" in obj:
         type = obj["type"]
@@ -145,6 +161,54 @@ def stix2_db(obj):
                     t.labels.add(l)
             t.save()
             return t
+        elif type == 'attack-pattern':
+            a, cre = model.objects.get_or_create(name=obj["name"])
+            a = _stix2property(a, obj)
+            a.save()
+            return a
+        elif type == 'campaign':
+            c, cre = model.objects.get_or_create(name=obj["name"])
+            c = _stix2property(c, obj)
+            if "aliases" in obj:
+                aliases = obj["aliases"]
+                for alias in aliases: 
+                    a, cre = CampaignAlias.objects.get_or_create(name=alias)
+                    c.aliases.add(a)
+            c.save()
+            return c
+        elif type == 'course-of-action':
+            c, cre = model.objects.get_or_create(name=obj["name"])
+            c = _stix2property(c, obj)
+            c.save()
+            return c
+        elif type == 'identity':
+            i, cre = model.objects.get_or_create(name=obj["name"])
+            if "description" in obj:
+                i.description = obj["description"]
+            if "identity_class" in obj:
+                i.identity_class = obj["identity_class"]
+            if "sectors" in obj:
+                sectors = obj["sectors"]
+                for sector in sectors: 
+                    s, cre = IndustrySector.objects.get_or_create(value=sector)
+                    i.sectors.add(s)
+            if "labels" in obj:
+                labels = obj["labels"]
+                for label in labels: 
+                    l, cre = IdentityLabel.objects.get_or_create(value=label)
+                    i.labels.add(l)
+            i.save()
+            return i
+        elif type == 'intrusion-set':
+            c, cre = model.objects.get_or_create(name=obj["name"])
+            c = _stix2property(c, obj)
+            if "aliases" in obj:
+                aliases = obj["aliases"]
+                for alias in aliases: 
+                    a, cre = IntrusionSetAlias.objects.get_or_create(name=alias)
+                    c.aliases.add(a)
+            c.save()
+            return c
         elif type == 'malware':
             m, cre = model.objects.get_or_create(name=obj["name"])
             if "description" in obj:
@@ -167,33 +231,12 @@ def stix2_db(obj):
                     t.labels.add(l)
             t.save()
             return t
-        elif type == 'attack-pattern':
-            a, cre = model.objects.get_or_create(name=obj["name"])
-            if "description" in obj:
-                a.description = obj["description"]
-            a.save()
-            return a
         elif type == 'vulnerability':
             v, cre = model.objects.get_or_create(name=obj["name"])
             if "description" in obj:
                 v.description = obj["description"]
             v.save()
             return v
-        elif type == 'campaign':
-            c, cre = model.objects.get_or_create(name=obj["name"])
-            if "description" in obj:
-                c.description = obj["description"]
-            if "first_seen" in obj:
-                c.first_seen = obj["first_seen"]
-            if "last_seen" in obj:
-                c.last_seen = obj["last_seen"]
-            if "aliases" in obj:
-                aliases = obj["aliases"]
-                for alias in aliases: 
-                    a, cre = CampaignAlias.objects.get_or_create(name=alias)
-                    c.aliases.add(a)
-            c.save()
-            return c
         elif type == 'indicator':
             i, cre = model.objects.get_or_create(name=obj["name"])
             if "description" in obj:
@@ -213,24 +256,6 @@ def stix2_db(obj):
             i.save()
             return i
 
-        elif type == 'identity':
-            i, cre = model.objects.get_or_create(name=obj["name"])
-            if "description" in obj:
-                i.description = obj["description"]
-            if "identity_class" in obj:
-                i.identity_class = obj["identity_class"]
-            if "sectors" in obj:
-                sectors = obj["sectors"]
-                for sector in sectors: 
-                    s, cre = IndustrySector.objects.get_or_create(value=sector)
-                    i.sectors.add(s)
-            if "labels" in obj:
-                labels = obj["labels"]
-                for label in labels: 
-                    l, cre = IdentityLabel.objects.get_or_create(value=label)
-                    i.labels.add(l)
-            i.save()
-            return i
 
 def stix2killchain(obj):
     kcps = []
@@ -267,6 +292,15 @@ def stix_bundle(objs, mask=True):
                 modified=obj.modified,
                 first_seen=obj.first_seen,
                 last_seen=obj.last_seen,
+            )
+            objects += (c,)
+        elif obj.object_type.name == 'course-of-action':
+            c = stix2.CourseOfAction(
+                id=obj.object_id.object_id,
+                name=obj.name,
+                description=obj.description,
+                created=obj.created,
+                modified=obj.modified,
             )
             objects += (c,)
         elif obj.object_type.name == 'identity':
@@ -316,7 +350,6 @@ def stix_bundle(objs, mask=True):
             )
             objects += (i,)
         elif obj.object_type.name == 'malware':
-            #kcps = stix2killchain(obj)
             m = stix2.Malware(
                 id=obj.object_id.object_id,
                 name=obj.name,
@@ -325,6 +358,20 @@ def stix_bundle(objs, mask=True):
                 created=obj.created,
                 modified=obj.modified,
                 kill_chain_phases=stix2killchain(obj),
+            )
+            objects += (m,)
+        elif obj.object_type.name == 'observed-data':
+            obs = {}
+            #for o in obj.observable_objects.all():
+                
+            m = stix2.ObservedData(
+                id=obj.object_id.object_id,
+                created=obj.created,
+                modified=obj.modified,
+                first_observed=obj.first_observed,
+                last_observed=obj.last_observed,
+                number_observed=obj.number_observed,
+                objects = obs,
             )
             objects += (m,)
         elif obj.object_type.name == 'report':
@@ -390,6 +437,7 @@ def stix_bundle(objs, mask=True):
                 id=obj.object_id.object_id,
                 sighting_of_ref=obj.sighting_of_ref.object_id,
                 where_sighted_refs=[str(w.object_id) for w in obj.where_sighted_refs.all()],
+                observed_data_refs=[str(od.object_id) for od in obj.observed_data_refs.all()],
                 first_seen=obj.first_seen,
                 last_seen=obj.last_seen,
                 created=obj.created,
@@ -434,6 +482,11 @@ def stix_view(request):
                             sdos[i] = res
                     for i in reps:
                         rep2db(reps[i], sdos)
+            messages.add_message(
+                request,
+                messages.SUCCESS,
+                'Import Completed'
+            )
         elif 'export' in request.POST:
             objs = []
             for i in STIXObjectID.objects.all():

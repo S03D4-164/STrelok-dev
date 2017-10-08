@@ -1,5 +1,6 @@
 from django.db import models
 from django.apps import apps
+from django.core.exceptions import ValidationError
 
 class STIXObjectType(models.Model):
     name = models.CharField(max_length=250, unique=True)
@@ -16,10 +17,6 @@ class STIXObjectID(models.Model):
     class Meta:
         ordering = ["object_id"]
     def __str__(self):
-        #return self.object_id
-        #if self.object_type.model_name:
-        #    m = apps.get_model(self._meta.app_label, self.object_type.model_name)
-        #    o = m.objects.get(id=self.id)
         o = get_obj_from_id(self)
         if o:
             if hasattr(o, "name"):
@@ -39,6 +36,8 @@ class STIXObjectID(models.Model):
                 if wsrs and s:
                     sighted = ",".join(wsrs) +" sighted "+ s.name
                     return o.object_type.name +":"+ sighted
+            else:
+                return self.object_id
         return self.object_id
 
 class RelationshipType(models.Model):
@@ -69,6 +68,35 @@ def get_obj_from_id(oid):
             return o
     return None
 
+def _simple_name(obj):
+    simple_name = obj.object_id.object_id
+    if obj.object_type.model_name:
+        m = apps.get_model(
+            obj._meta.app_label, 
+            obj.object_type.model_name
+        )
+        o = m.objects.get(id=obj.id)
+        if hasattr(o, "name"):
+            simple_name = ":".join([o.object_type.name, o.name])
+        elif o.object_type.name == "relationship":
+            s = get_obj_from_id(o.source_ref)
+            t = get_obj_from_id(o.target_ref)
+            if s and t:
+                r = " ".join([s.name, o.relationship_type.name, t.name])
+                simple_name = ":".join([o.object_type.name, r])
+            elif o.object_type.name == "sighting":
+                wsrs = []
+                for wsr in o.where_sighted_refs.all():
+                    w = get_obj_from_id(wsr)
+                    wsrs.append(w.name)
+                s = get_obj_from_id(o.sighting_of_ref)
+                if wsrs and s:
+                    sighted = ",".join(wsrs) +" sighted "+ s.name
+                    simple_name = o.object_type.name +":"+ sighted
+    obj.simple_name = simple_name
+    return obj
+
+
 class STIXObject(models.Model):
     object_type = models.ForeignKey(STIXObjectType, blank=True, null=True)
     object_id = models.OneToOneField(STIXObjectID, blank=True, null=True)
@@ -77,6 +105,7 @@ class STIXObject(models.Model):
     created_by_ref = models.ForeignKey(STIXObjectID, related_name="created_by_ref", blank=True, null=True)
     confidence = models.PositiveSmallIntegerField(blank=True, null=True)
     #object_marking_refs = models.ManyToManyField(STIXObjectID, blank=True)
+    #simple_name = models.CharField(max_length=250, blank=True, null=True)
     class Meta:
         unique_together = (("object_type", "object_id"),)
         ordering = ["object_type", "object_id"]
@@ -84,7 +113,11 @@ class STIXObject(models.Model):
         if self.object_id:
             self.object_id.delete()
         super(STIXObject, self).delete()
+    #def save(self, *args, **kwargs):
+        #self = _simple_name(self)
+        #super(STIXObject, self).save(*args, **kwargs)
     def __str__(self):
+        #return self.simple_name
         if self.object_type.model_name:
             m = apps.get_model(self._meta.app_label, self.object_type.model_name)
             o = m.objects.get(id=self.id)
@@ -105,6 +138,8 @@ class STIXObject(models.Model):
                 if wsrs and s:
                     sighted = ",".join(wsrs) +" sighted "+ s.name
                     return o.object_type.name +":"+ sighted
+            else:
+                return self.object_id.object_id
         return self.object_id.object_id
 
 class MarkingDefinition(STIXObject):
@@ -121,13 +156,6 @@ class MarkingDefinition(STIXObject):
     def __str__(self):
         return ":".join([definition_type,definition])
 
-class ReportLabel(models.Model):
-    value = models.CharField(max_length=250, unique=True)
-    def __str__(self):
-        return self.value
-    class Meta:
-        ordering = ["value"]
-
 def _set_id(obj, name):
     from uuid import uuid4
     if not obj.object_type:
@@ -141,15 +169,57 @@ def _set_id(obj, name):
         obj.object_id = soi
     return obj
 
-class Report(STIXObject):
+class KillChainPhase(models.Model):
+    kill_chain_name = models.CharField(max_length=250)
+    phase_name = models.CharField(max_length=250)
+    def __str__(self):
+        return self.phase_name
+    class Meta:
+        unique_together = (("kill_chain_name", "phase_name"),)
+        ordering = ["phase_name"]
+
+# SDO
+
+class AttackPattern(STIXObject):
     name = models.CharField(max_length=250, unique=True)
-    labels = models.ManyToManyField(ReportLabel)
     description = models.TextField(blank=True, null=True)
-    published = models.DateTimeField(blank=True, null=True)
-    object_refs = models.ManyToManyField(STIXObjectID, blank=True)
+    #external_references = models.ManyToManyField(ExternalReference, blank=True)
+    kill_chain_phases = models.ManyToManyField(KillChainPhase, blank=True)
     def save(self, *args, **kwargs):
-        self = _set_id(self, 'report')
-        super(Report, self).save(*args, **kwargs)
+        self = _set_id(self, 'attack-pattern')
+        super(AttackPattern, self).save(*args, **kwargs)
+    def __str__(self):
+        return self.name
+    class Meta:
+        ordering = ["name"]
+
+class CampaignAlias(models.Model):
+    name = models.CharField(max_length=250, unique=True, blank=False)
+    def __str__(self):
+        return self.name
+    class Meta:
+        ordering = ["name"]
+
+class Campaign(STIXObject):
+    name = models.CharField(max_length=250, unique=True)
+    description = models.TextField(blank=True, null=True)
+    aliases = models.ManyToManyField(CampaignAlias, blank=True)
+    first_seen = models.DateTimeField(blank=True, null=True)
+    last_seen = models.DateTimeField(blank=True, null=True)
+    def save(self, *args, **kwargs):
+        self = _set_id(self, 'campaign')
+        super(Campaign, self).save(*args, **kwargs)
+    def __str__(self):
+        return self.name
+    class Meta:
+        ordering = ["name"]
+
+class CourseOfAction(STIXObject):
+    name = models.CharField(max_length=250, unique=True)
+    description = models.TextField(blank=True, null=True)
+    def save(self, *args, **kwargs):
+        self = _set_id(self, 'course-of-action')
+        super(CourseOfAction, self).save(*args, **kwargs)
     def __str__(self):
         return self.name
     class Meta:
@@ -162,14 +232,6 @@ class IdentityLabel(models.Model):
         return self.value
     class Meta:
         ordering = ["value"]
-
-class IndustrialClassification(models.Model):
-    group = models.CharField(max_length=250, unique=True)
-    label = models.ManyToManyField(IdentityLabel)
-    def __str__(self):
-        return self.group
-    class Meta:
-        ordering = ["group"]
 
 class IndustrySector(models.Model):
     value = models.CharField(max_length=250, unique=True)
@@ -201,44 +263,22 @@ class Identity(STIXObject):
     class Meta:
         ordering = ["name"]
 
-class KillChainPhase(models.Model):
-    kill_chain_name = models.CharField(max_length=250)
-    phase_name = models.CharField(max_length=250)
-    def __str__(self):
-        return self.phase_name
-    class Meta:
-        unique_together = (("kill_chain_name", "phase_name"),)
-        ordering = ["phase_name"]
-
-
-class AttackPattern(STIXObject):
-    name = models.CharField(max_length=250, unique=True)
-    description = models.TextField(blank=True, null=True)
-    #external_references = models.ManyToManyField(ExternalReference, blank=True)
-    kill_chain_phases = models.ManyToManyField(KillChainPhase, blank=True)
-    def save(self, *args, **kwargs):
-        self = _set_id(self, 'attack-pattern')
-        super(AttackPattern, self).save(*args, **kwargs)
+class IntrusionSetAlias(models.Model):
+    name = models.CharField(max_length=250, unique=True, blank=False)
     def __str__(self):
         return self.name
     class Meta:
         ordering = ["name"]
 
-class ToolLabel(models.Model):
-    value = models.CharField(max_length=250, unique=True)
-    def __str__(self):
-        return self.value
-    class Meta:
-        ordering = ["value"]
-
-class Tool(STIXObject):
+class IntrusionSet(STIXObject):
     name = models.CharField(max_length=250, unique=True)
     description = models.TextField(blank=True, null=True)
-    labels = models.ManyToManyField(ToolLabel, blank=True)
-    kill_chain_phases = models.ManyToManyField(KillChainPhase, blank=True)
+    aliases = models.ManyToManyField(IntrusionSetAlias, blank=True)
+    first_seen = models.DateTimeField(blank=True, null=True)
+    last_seen = models.DateTimeField(blank=True, null=True)
     def save(self, *args, **kwargs):
-        self = _set_id(self, 'tool')
-        super(Tool, self).save(*args, **kwargs)
+        self = _set_id(self, 'intrusion-set')
+        super(IntrusionSet, self).save(*args, **kwargs)
     def __str__(self):
         return self.name
     class Meta:
@@ -264,12 +304,22 @@ class Malware(STIXObject):
     class Meta:
         ordering = ["name"]
 
-class Vulnerability(STIXObject):
+class ReportLabel(models.Model):
+    value = models.CharField(max_length=250, unique=True)
+    def __str__(self):
+        return self.value
+    class Meta:
+        ordering = ["value"]
+
+class Report(STIXObject):
     name = models.CharField(max_length=250, unique=True)
+    labels = models.ManyToManyField(ReportLabel)
     description = models.TextField(blank=True, null=True)
+    published = models.DateTimeField(blank=True, null=True)
+    object_refs = models.ManyToManyField(STIXObjectID, blank=True)
     def save(self, *args, **kwargs):
-        self = _set_id(self, 'vulnerability')
-        super(Vulnerability, self).save(*args, **kwargs)
+        self = _set_id(self, 'report')
+        super(Report, self).save(*args, **kwargs)
     def __str__(self):
         return self.name
     class Meta:
@@ -303,20 +353,36 @@ class ThreatActor(STIXObject):
     class Meta:
         ordering = ["name"]
 
-class Relationship(STIXObject):
-    source_ref= models.ForeignKey(STIXObjectID, related_name='source_ref')
-    target_ref = models.ForeignKey(STIXObjectID, related_name='target_ref')
-    relationship_type = models.ForeignKey(RelationshipType)
-    description = models.TextField(blank=True, null=True)
+class ToolLabel(models.Model):
+    value = models.CharField(max_length=250, unique=True)
     def __str__(self):
-        #src = self.source_ref.object_id
-        #tgt = self.target_ref.object_id
-        #rel = self.relationship_type.name
-        #return " ".join([src, rel, tgt])
-        return self.object_id.object_id
+        return self.value
+    class Meta:
+        ordering = ["value"]
+
+class Tool(STIXObject):
+    name = models.CharField(max_length=250, unique=True)
+    description = models.TextField(blank=True, null=True)
+    labels = models.ManyToManyField(ToolLabel, blank=True)
+    kill_chain_phases = models.ManyToManyField(KillChainPhase, blank=True)
     def save(self, *args, **kwargs):
-        self = _set_id(self, 'relationship')
-        super(Relationship, self).save(*args, **kwargs)
+        self = _set_id(self, 'tool')
+        super(Tool, self).save(*args, **kwargs)
+    def __str__(self):
+        return self.name
+    class Meta:
+        ordering = ["name"]
+
+class Vulnerability(STIXObject):
+    name = models.CharField(max_length=250, unique=True)
+    description = models.TextField(blank=True, null=True)
+    def save(self, *args, **kwargs):
+        self = _set_id(self, 'vulnerability')
+        super(Vulnerability, self).save(*args, **kwargs)
+    def __str__(self):
+        return self.name
+    class Meta:
+        ordering = ["name"]
 
 
 class IndicatorLabel(models.Model):
@@ -388,7 +454,7 @@ class ObservedData(STIXObject):
     first_observed = models.DateTimeField()
     last_observed = models.DateTimeField()
     number_observed = models.PositiveSmallIntegerField(default=1)
-    objects = models.ManyToManyField(ObservableObject)
+    observable_objects = models.ManyToManyField(ObservableObject)
     def save(self, *args, **kwargs):
         self = _set_id(self, 'observed-data')
         super(ObservedData, self).save(*args, **kwargs)
@@ -412,47 +478,29 @@ class Indicator(STIXObject):
         self = _set_id(self, 'indicator')
         super(Indicator, self).save(*args, **kwargs)
 
-class CampaignAlias(models.Model):
-    name = models.CharField(max_length=250, unique=True, blank=False)
-    def __str__(self):
-        return self.name
-    class Meta:
-        ordering = ["name"]
-
-class Campaign(STIXObject):
-    name = models.CharField(max_length=250, unique=True)
+# SRO
+class Relationship(STIXObject):
+    source_ref= models.ForeignKey(STIXObjectID, related_name='source_ref')
+    target_ref = models.ForeignKey(STIXObjectID, related_name='target_ref')
+    relationship_type = models.ForeignKey(RelationshipType)
     description = models.TextField(blank=True, null=True)
-    aliases = models.ManyToManyField(CampaignAlias, blank=True)
-    first_seen = models.DateTimeField(blank=True, null=True)
-    last_seen = models.DateTimeField(blank=True, null=True)
+    def __str__(self):
+        #src = self.source_ref.object_id
+        #tgt = self.target_ref.object_id
+        #rel = self.relationship_type.name
+        #return " ".join([src, rel, tgt])
+        return self.object_id.object_id
     def save(self, *args, **kwargs):
-        self = _set_id(self, 'campaign')
-        super(Campaign, self).save(*args, **kwargs)
-    def __str__(self):
-        return self.name
-    class Meta:
-        ordering = ["name"]
-
-class IntrusionSetAlias(models.Model):
-    name = models.CharField(max_length=250, unique=True, blank=False)
-    def __str__(self):
-        return self.name
-    class Meta:
-        ordering = ["name"]
-
-class IntrusionSet(STIXObject):
-    name = models.CharField(max_length=250, unique=True)
-    description = models.TextField(blank=True, null=True)
-    aliases = models.ManyToManyField(IntrusionSetAlias, blank=True)
-    first_seen = models.DateTimeField(blank=True, null=True)
-    last_seen = models.DateTimeField(blank=True, null=True)
-    def save(self, *args, **kwargs):
-        self = _set_id(self, 'intrusion-set')
-        super(IntrusionSet, self).save(*args, **kwargs)
-    def __str__(self):
-        return self.name
-    class Meta:
-        ordering = ["name"]
+        v = DefinedRelationship.objects.filter(
+            type=self.relationship_type,
+            source__name=str(self.source_ref.object_id).split("--")[0],
+            target__name=str(self.target_ref.object_id).split("--")[0],
+        )
+        if not v:
+            raise ValidationError("Invalid Relationship")
+        else:
+            self = _set_id(self, 'relationship')
+            super(Relationship, self).save(*args, **kwargs)
 
 class Sighting(STIXObject):
     sighting_of_ref= models.ForeignKey(STIXObjectID, related_name='sighting_of_ref')
@@ -460,7 +508,6 @@ class Sighting(STIXObject):
     first_seen = models.DateTimeField()
     last_seen = models.DateTimeField(blank=True, null=True)
     observed_data_refs = models.ManyToManyField(ObservedData, related_name='observed_data_refs')
-    description = models.TextField(blank=True, null=True)
     def save(self, *args, **kwargs):
         self = _set_id(self, 'sighting')
         super(Sighting, self).save(*args, **kwargs)

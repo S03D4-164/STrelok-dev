@@ -13,10 +13,11 @@ def viz_drs(request):
         user = request.user
     if request.user.is_verified():
         verified = True
+    #types = STIXObjectType.objects.all().values_list("name",flat=True)
     c = {
         "user":user,
         "vefified":verified,
-        "tsform":TypeSelectForm()
+        "tsform":TypeSelectForm(),
     }
     return render(request, "drs_viz.html", c)
 

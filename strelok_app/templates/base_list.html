@@ -14,28 +14,32 @@
 <script src="/static/js/chart_tgt.js"></script>
 {% endif %}
 <script>
+function getDataTable(type){
+	$('#objtype_table').dataTable({
+            //"destroy":true,
+            "processing":true,
+            "serverSide":true,
+            //"ajax": "/data/{{type}}",
+            "ajax": "/data/"+type,
+            "order":[0, 'desc'],
+            "lengthMenu": [[ 10, 50, 100, 200 ],[ 10, 50, 100, 200 ],],
+            "pageLength": 10,
+            "stateSave": true,
+        });
+};
 $(document).ready(
     function(){
         $('a[data-toggle="tab"]').on( 'shown.bs.tab', function (e) {
             $.fn.dataTable.tables( {visible: true, api: true} ).columns.adjust();
         } );
-	$('#objtype_table').dataTable({
-            "processing":true,
-            "serverSide":true,
-            "ajax": "/data/{{type}}",
-            "order":[0, 'desc'],
-        });
-	$('#obs_table').dataTable({
-            "processing":true,
-            "serverSide":true,
-            "ajax": "/data/observable",
-            "order":[0, 'desc'],
-        });
+        getDataTable("{{type}}");
         $('#id_published').datetimepicker({format:'Y-m-d H:i'});
         $('#id_first_seen').datetimepicker({format:'Y-m-d H:i'});
         $('#id_last_seen').datetimepicker({format:'Y-m-d H:i'});
         $('#id_valid_from').datetimepicker({format:'Y-m-d H:i'});
         $('#id_valid_until').datetimepicker({format:'Y-m-d H:i'});
+        $('#id_first_observed').datetimepicker({format:'Y-m-d H:i'});
+        $('#id_last_observed').datetimepicker({format:'Y-m-d H:i'});
         {% if type == "threat-actor" %}
         actorChart({{data|safe}});
         {% elif type == "identity" %}
@@ -92,7 +96,7 @@ $(document).ready(
 {% block top_pane %}{% endblock %}
 
 {% block left_pane %}
-{% if type == "threat-actor" or type == "identity" or type == "indicator" %}
+{% if type == "threat-actor" or type == "identity" %}
 <div id="left_pane" class="col-md-6">
 {% else %}
 <div id="left_pane" class="col-md-12">
@@ -109,23 +113,38 @@ $(document).ready(
 <thead><tr>
 {% block left_thead %}
 <th >Created</th>
+{% if type == "relationship" %}
+<th>Object ID</th>
+<th>Source</th>
+<th>Type</th>
+<th>Target</th>
+{% elif type == "sighting" %}
+<th>Object ID</th>
+<th>Where Sighted</th>
+<th>Sighting of</th>
+{% elif type == "observed-data" %}
+<th>Object ID</th>
+<th>Objects</th>
+{% else %}
 <th >Name</th>
 {% if type == "report" %}
 <th class="col-md-2">Created By</th>
 <th class="col-md-2">Published</th>
+{% elif type == "attack-pattern" %}
+<th class="col-md-3">Kill Chain</th>
 {% elif type == "identity" %}
 <th class="col-md-3">Sector</th>
 {% elif type == "malware" or type == "tool" %}
 <th class="col-md-3">Labels</th>
 <th class="col-md-3">Kill Chain</th>
-<!--<th class="col-md-3">Description</th>-->
-{% elif type == "campaign" %}
+{% elif type == "campaign" or type == "intrusion-set" %}
 <th >Aliases</th>
 <th class="col-md-2">First Seen</th>
 {% elif type == "threat-actor" %}
 <th >Aliases</th>
 {% elif type == "indicator" %}
 <th >Pattern</th>
+{% endif %}
 {% endif %}
 {% endblock %}
 </tr></thead>
@@ -134,20 +153,8 @@ $(document).ready(
 {% endblock %}
 
 {% block right_pane %}
-{% if type == "indicator" %}
-<div id="left_pane" class="col-md-6">
-<h3 style="margin-top: 0">Observable Objects
-</h3>
-<hr>
-<table id="obs_table" class="table table-condensed table-stripe table-hover display" width="100%">
-<thead><tr>
-<th >ID</th>
-<th class="col-md-10">Type</th>
-</tr></thead>
-</table>
-</div><!--/#left_pane-->
-{% elif type == "threat-actor" or type == "identity" %}
-<div id="left_pane" class="col-md-6">
+{% if type == "threat-actor" or type == "identity" %}
+<div id="right_pane" class="col-md-6">
 <div class="panel panel-default">
 
 <div class="panel-heading">
@@ -161,7 +168,6 @@ Stats
 </div><!--/.col-md-6-->
 {% endif %}
 {% endblock %}
-
 
 {% block stixvizlib %}{% endblock %}
 
