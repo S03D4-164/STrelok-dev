@@ -169,7 +169,7 @@ def stats_ati():
 def cnt_tgt_by_label():
     dataset = []
     sights = Sighting.objects.filter(
-        where_sighted_refs__object_id__startswith="identity--",
+        #where_sighted_refs__object_id__startswith="identity--",
         sighting_of_ref__object_id__startswith="threat-actor--",
     )
     rels = Relationship.objects.filter(

@@ -356,15 +356,11 @@ class TimelineForm(forms.Form):
 
 class SightingForm(forms.ModelForm):
     observable = forms.CharField(
-        widget=forms.Textarea(
-            attrs={'style':'height:100px;'}
-        )
+        widget=forms.Textarea()
     )
-    """
-    sighting_of = forms.ModelMultipleChoiceField(
-        queryset = STIXObjectID.objects.all()
-    )
-    """
+    #sighting_of = forms.ModelMultipleChoiceField(
+    #    queryset = STIXObjectID.objects.all()
+    #)
     class Meta:
         model = Sighting
         fields = [
@@ -389,17 +385,36 @@ class SightingForm(forms.ModelForm):
             )
         )
         self.fields["sighting_of_ref"].choices = schoices
-        self.fields["where_sighted_refs"].choices = object_choices(
-            ids=identity_oid
-            #ids=STIXObjectID.objects.filter(
-            #    object_id__startswith="identity--",
-            #),
-        )
         self.fields["observable"].required = False
-        """
-        self.fields["sighting_of"].choices = schoices
-        self.fields["where_sighted_refs"].required = False
-        """
+        self.fields["observed_data_refs"].required = False
+        #self.fields["sighting_of"].choices = schoices
+    def clean(self):
+        c = self.cleaned_data
+        first = c["first_seen"]
+        last = c["last_seen"]
+        if first and not last:
+            last = first
+        new = c["observable"]
+        obs = []
+        # create observable objects
+        for line in new.split("\n"):
+            if line:
+                o, p = create_obs_from_line(line)
+                if o:
+                    obs.append(o.id)
+        # create observed-data and set observable objects
+        od = ObservedData.objects.create(
+            first_observed=first,
+            last_observed=last,
+            number_observed=1,
+        )
+        od.observable_objects = ObservableObject.objects.filter(id__in=obs)
+        od.save()
+        # set observed-data to sighting
+        ods = list(c["observed_data_refs"].values_list("id", flat=True))
+        ods.append(od.id)
+        c["observed_data_refs"] = ObservedData.objects.filter(id__in=ods)
+        return c
 
 class MalwareLabelForm(forms.ModelForm):
     class Meta:
@@ -530,52 +545,55 @@ class MatrixForm(forms.Form):
         self.fields["type"].required = False
 
 
-def get_related_obj(sdo):
+def get_related_obj(so):
     objects = []
-    ids = [sdo.object_id.id]
-    rels = None
-    sights = None
-    if sdo.object_type.name == "report":
-        sdo = Report.objects.get(id=sdo.id)
-        ids += sdo.object_refs.all().values_list("id",flat=True)
-        rels = Relationship.objects.filter(id__in=sdo.object_refs.all())
-        sights = Sighting.objects.filter(id__in=sdo.object_refs.all())
-    elif sdo.object_type.name == "sighting":
+    ids = [so.object_id.id]
+
+    rels = Relationship.objects.filter(
+            Q(source_ref=so.object_id)|\
+            Q(target_ref=so.object_id)
+    )
+    sights = Sighting.objects.filter(
+            #Q(where_sighted_refs=so.object_id)|\
+            #Q(observed_data_refs=so.object_id)|\
+            Q(sighting_of_ref=so.object_id)
+    )
+    rep = Report.objects.filter(object_refs=so.object_id)
+
+    if so.object_type.name == "identity":
+        sights = Sighting.objects.filter(where_sighted_refs=so)
+    elif so.object_type.name == "observed-data":
+        sights = Sighting.objects.filter(observed_data_refs=so)
+    elif so.object_type.name == "report":
+        # no relation but refs contains SRO
+        so = Report.objects.get(id=so.id)
+        ids += so.object_refs.all().values_list("id",flat=True)
+        rels = Relationship.objects.filter(id__in=so.object_refs.all())
+        sights = Sighting.objects.filter(id__in=so.object_refs.all())
+    elif so.object_type.name == "sighting":
         sights = Sighting.objects.filter(object_id__id__in=ids)
-        ids += sdo.observed_data_refs.all().values_list("id",flat=True)
-    elif sdo.object_type.name == "relationship":
+    elif so.object_type.name == "relationship":
         rels = Relationship.objects.filter(object_id_id__in=ids)
-    else:
-        rels = Relationship.objects.filter(
-            Q(source_ref=sdo.object_id)\
-            |Q(target_ref=sdo.object_id)\
-        )
-        sights = Sighting.objects.filter(
-            Q(where_sighted_refs=sdo.object_id)\
-            |Q(sighting_of_ref=sdo.object_id)\
-        )
-    rep = Report.objects.filter(object_refs=sdo.object_id)
-    if rep:
-        ids += rep.values_list("object_refs", flat=True)
+
     if rels:
-        #print(rels)
         ids += rels.values_list("object_id", flat=True)
         ids += rels.values_list("source_ref", flat=True)
         ids += rels.values_list("target_ref", flat=True)
     if sights:
-        #print(sights)
         ids += sights.values_list("object_id", flat=True)
         ids += sights.values_list("sighting_of_ref", flat=True)
         ids += sights.values_list("where_sighted_refs", flat=True)
-    oids = STIXObjectID.objects.filter(
-        id__in=ids
-    )
+        ids += sights.values_list("observed_data_refs", flat=True)
+    if rep:
+        ids += rep.values_list("object_id", flat=True)
+        ids += rep.values_list("object_refs", flat=True)
+
+    oids = STIXObjectID.objects.filter(id__in=ids)
     for oid in oids:
-        #print(oid)
         obj = get_obj_from_id(oid)
         if obj:
-            objects.append(obj)
-    #print(objects)
+            if not obj in objects:
+                objects.append(obj)
     return objects
 
 def object_choices(
@@ -673,9 +691,13 @@ class DomainNameForm(forms.ModelForm):
         model = DomainNameObject
         fields = [
             "value",
-            "resolve_to_refs",
+            "resolves_to_refs",
         ]
     def __init__(self, *args, **kwargs):
         super(DomainNameForm, self).__init__(*args, **kwargs)
         self.fields["new_refs"].required = False
 
+class KillChainForm(forms.Form):
+    killchain = forms.ModelChoiceField(
+        queryset=KillChainPhase.objects.all()
+    )

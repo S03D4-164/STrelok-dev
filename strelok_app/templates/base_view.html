@@ -147,28 +147,41 @@ $(document).ready(
 </div><!--/.modal-->
 {% endblock %}
 
+{% block modal_sight %}
+<div class="modal" id="sight_form" role="dialog">
+<div class="modal-dialog"><div class="modal-content">
+<div class="modal-header">
+<button type="button" class="close" data-dismiss="modal">&times;</button>
+<h4 class="modal-title">Add Sighting</h4>
+</div>
+<div class="modal-body">
+<form class="sight_form" method="post">{% csrf_token %}
+<table class="table">
+{{asform.as_table}}
+</table>
+<input class="btn btn-primary btn-sm" type="submit" name="add_sight" value="Add">
+</form>
+</div><!--/.modal-body-->
+</div><!--/.modal-content-->
+</div><!--/.modal-dialog-->
+</div><!--/.modal-->
+{% endblock %}
+
 {% block modal_add %}
 <div class="modal" id="add_form" role="dialog">
 <div class="modal-dialog"><div class="modal-content">
 <div class="modal-header">
 <button type="button" class="close" data-dismiss="modal">&times;</button>
-<h4 class="modal-title">Add Object</h4>
+<h4 class="modal-title">Add Related Object</h4>
+{{obj.object_type.name}}: {{obj.name}}
 </div>
 <div class="modal-body">
 <form class="add_form" method="post">{% csrf_token %}
-{% if obj.object_type.name == "identity" %}
-<table class="table">
-<th>Where Sighted</th><td>{{obj.object_type.name|capfirst}}:{{obj.name}}</td>
-{{aoform.as_table}}
-</table>
-<input class="btn btn-primary btn-sm" type="submit" name="add_sight" value="Add">
-{% else %}
 {% if obj.object_type.name == "report" %}
 <div id="select_type" >
 {{soform}}
 {% elif obj.object_type.name != "report" %}
 <div id="select_add">
-<h4>{{obj.object_type.name|capfirst}}:{{obj.name}}</h4>
 {{aoform.relation}}
 {% endif %}
 <div id="add_obj" >
@@ -176,7 +189,6 @@ $(document).ready(
 </div>
 <input class="btn btn-primary btn-sm" type="submit" name="add_obj" value="Add">
 </div>
-{% endif %}
 </form>
 </div><!--/.modal-body-->
 </div><!--/.modal-content-->
@@ -189,7 +201,8 @@ $(document).ready(
 <div class="modal-dialog"><div class="modal-content">
 <div class="modal-header">
 <button type="button" class="close" data-dismiss="modal">&times;</button>
-<h4 class="modal-title">Create Object</h4>
+<h4 class="modal-title">Create Related Object</h4>
+{{obj.object_type.name}}: {{obj.name}}
 </div>
 <div class="modal-body">
 <form class="create_form" method="post">{% csrf_token %}
@@ -331,11 +344,12 @@ $(document).ready(
 <tr><th >Alias</th><td>{% for a in obj.aliases.all %}{{a}}<br>{% endfor%}</td></tr>
 {% endif %}
 {% endblock %}
-
+{% if obj.description %}
 <tr>
 <th class="col-md-3">Description</th>
 <td><pre>{{obj.description}}</pre></td>
 </tr>
+{% endif %}
 </table>
 
 </div><!--/.panel-body-->
@@ -369,9 +383,8 @@ STIX
 <li class="active"><a data-toggle="tab" href="#obj_tab">Objects</a></li>
 <li ><a data-toggle="tab" href="#rel_tab">Relations</a></li>
 <li><a data-toggle="tab" href="#sight_tab">Sightings</a></li>
-{% if obj.object_type.name == "indicator" %}
 <li><a data-toggle="tab" href="#obs_tab">Observables</a></li>
-{% elif obj.object_type.name == "report" %}
+{% if obj.object_type.name == "report" %}
 <li><a data-toggle="tab" href="#objrefs_tab">Object Refs</a></li>
 {% endif %}
 </ul>
@@ -379,12 +392,14 @@ STIX
 <div class="panel-body">
 {% if user.is_authenticated %}
 <a class="btn btn-primary btn-xs" data-toggle="modal" href="#add_form">Add</a>
-{% if obj.object_type.name != "identity" %}
 <a class="btn btn-info btn-xs" data-toggle="modal" href="#create_form">Create</a>
+{% if obj.object_type.name == "identity" %}
+<a class="btn btn-info btn-xs" data-toggle="modal" href="#sight_form">Sighting</a>
+{% elif obj.object_type.name == "report" %}
 <a class="btn btn-info btn-xs" data-toggle="modal" href="#bulk_form">Bulk Create</a>
 {% endif %}
 <a class="btn btn-warning btn-xs" onclick=detachObject()>Detach</a>
-<a class="btn btn-warning btn-xs" >Connect</a>
+<!--a class="btn btn-warning btn-xs" >Connect</a-->
 {% endif %}
 <div class="tab-content">
 
@@ -409,20 +424,19 @@ STIX
 </div>
 {% endif %}
 
-{% if obj.object_type.name == "indicator" %}
 <div class="tab-pane" id="obs_tab" >
-<h4>Indicator Pattern</h4>
 {% if obj.object_type.name == "indicator" %}
+<h4>Indicator Pattern</h4>
 <a class="btn btn-info btn-xs" data-toggle="modal" href="#pattern_form">Edit</a>
-{% endif %}
 <pre>{{obj.pattern.pattern}}</pre>
+{% endif %}
 <table id="obs_table" class="table table-condensed table-stripe table-hover display" width="100%">
 <thead><tr>
 <th class="col-sm-1"> </th>
 <th >Observables</th>
 </tr></thead>
 <tbody >
-{% for o in obj.pattern.observable.all %}
+{% for o in obj.observable_objects.all %}
 <tr>
 <td><input class="object_id" type="checkbox" value="{{o.object_id}}"></td>
 <td><a href="/observable/{{o.id}}">{{o}}</td>
@@ -431,8 +445,6 @@ STIX
 </tbody>
 </table>
 </div>
-{% endif %}
-
 
 <div class="tab-pane" id="sight_tab" >
 <table id="sight_table" class="table table-condensed table-stripe table-hover display" width="100%">
@@ -453,21 +465,21 @@ STIX
 <!--<td><a class="btn btn-primary btn-xs">{{s.id}}</a></td>-->
 {% for r in s.where_sighted_refs.all %}
 {% for o in objects %}
-{% ifequal o.object_id r %}
+{% if o == r %}
 <a href="/stix/{{o.object_id.object_id}}">
 <span class="label label-default">{{o.object_type.name}}</span><br>
 {% if not mask%}{{o.name}}{% else %}{{o.object_id.object_id}}{% endif %}</a><br>
-{% endifequal %}
+{% endif %}
 {% endfor %}
 {% endfor %}
 </td>
 <td>
 {% for o in objects %}
-{% ifequal o.object_id s.sighting_of_ref %}
+{% if o.object_id == s.sighting_of_ref %}
 <a href="/stix/{{o.object_id.object_id}}">
 <span class="label label-default">{{o.object_type.name}}</span><br>
 {{o.name}}</a><br>
-{% endifequal %}
+{% endif %}
 {% endfor %}
 </td>
 <!--<td>{{s.object_id.object_id}}</td>-->
@@ -534,13 +546,6 @@ STIX
 
 <table id="obj_table" class="table table-condensed table-stripe table-hover display" width="100%">
 <thead><tr>
-<!--
-<th class="col-sm-2">
-<form>{% csrf_token %}
-<div id="filter">Type:{{soform.type}}</div>
-</form>
-</th>
--->
 <th data-sort-default class="col-sm-4">Type</th>
 <th class="col-sm-4">Name</th>
 <th class="col-sm-4">Label</th>
@@ -550,7 +555,10 @@ STIX
 <tr>
 <td>{{o.object_type.name}}</td>
 <td><a href="/stix/{{o.object_id.object_id}}">
-{% if mask and o.object_type.name == "identity" %}{{o.object_id.object_id}}{% else %}{{o.name}}{% endif %}
+{% if mask and o.object_type.name == "identity" %}{{o.object_id.object_id}}
+{% elif o.object_type.name == "observed-data" %}{{o.object_id.object_id}}
+{% else %}{{o.name}}
+{% endif %}
 </a></td>
 <td>{% for l in o.labels.all %}{{l}}<br>{% endfor %}</td>
 <!--<td>{{o.object_id.object_id}}</td>-->

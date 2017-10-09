@@ -37,12 +37,12 @@ div.modal-body input[type="text"] {
 
 form.create_form select[multiple]{
     //width:100%;
-    height:150px;
+    height:100px;
 }
 
 form.add_form select[multiple]{
     width:100%;
-    height:150px;
+    height:100px;
 }
 
 

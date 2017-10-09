@@ -418,7 +418,8 @@ class ObservableObject(models.Model):
 
 class DomainNameObject(ObservableObject):
     value = models.CharField(max_length=25000, unique=True)
-    resolve_to_refs = models.ManyToManyField(ObservableObject, related_name="resolve_to_refs", blank=True)
+    #resolve_to_refs = models.ManyToManyField(ObservableObject, related_name="resolve_to_refs", blank=True)
+    resolves_to_refs = models.ManyToManyField(ObservableObject, related_name="resolves_to_refs", blank=True)
     def __str__(self):
         return self.value
     class Meta:
@@ -426,7 +427,7 @@ class DomainNameObject(ObservableObject):
 
 class IPv4AddressObject(ObservableObject):
     value = models.CharField(max_length=15, unique=True)
-    #resolve_to_refs = models.ManyToManyField(ObservableObject)
+    #resolves_to_refs = models.ManyToManyField(ObservableObject)
     def __str__(self):
         return self.value
     class Meta:
@@ -504,7 +505,8 @@ class Relationship(STIXObject):
 
 class Sighting(STIXObject):
     sighting_of_ref= models.ForeignKey(STIXObjectID, related_name='sighting_of_ref')
-    where_sighted_refs = models.ManyToManyField(STIXObjectID, related_name='where_sighted_ref')
+    #where_sighted_refs = models.ManyToManyField(STIXObjectID, related_name='where_sighted_ref')
+    where_sighted_refs = models.ManyToManyField(Identity, related_name='where_sighted_ref')
     first_seen = models.DateTimeField()
     last_seen = models.DateTimeField(blank=True, null=True)
     observed_data_refs = models.ManyToManyField(ObservedData, related_name='observed_data_refs')

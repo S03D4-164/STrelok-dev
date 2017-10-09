@@ -1,7 +1,8 @@
 from django.conf.urls import url, include
 from django.contrib import admin, auth
 
-from .views.sdo import sdo_list,sdo_view, obs_view
+from .views.sdo import sdo_list,sdo_view
+from .views.observables import obs_view
 from .views.drs import viz_drs, data_drs
 from .views.stix import stix_view ,stix2_json, stix2type_json
 from .views.taxii import taxii_discovery, taxii_collection, taxii_get_objects

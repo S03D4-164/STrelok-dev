@@ -362,9 +362,23 @@ def stix_bundle(objs, mask=True):
             objects += (m,)
         elif obj.object_type.name == 'observed-data':
             obs = {}
-            #for o in obj.observable_objects.all():
-                
-            m = stix2.ObservedData(
+            for o in obj.observable_objects.all():
+                ob = None
+                if o.type.name == "file":
+                    f = FileObject.objects.get(id=o.id)
+                    ob = stix2.File(name=f.name)
+                elif o.type.name == "ipv4-addr":
+                    i = IPv4AddressObject.objects.get(id=o.id)
+                    ob = stix2.IPv4Address(value=i.value)
+                elif o.type.name == "url":
+                    u = URLObject.objects.get(id=o.id)
+                    ob = stix2.URL(value=u.value)
+                elif o.type.name == "domain-name":
+                    dn = DomainNameObject.objects.get(id=o.id)
+                    ob = stix2.DomainName(value=dn.value)
+                if ob:
+                    obs[o.id] = json.loads(str(ob))
+            od = stix2.ObservedData(
                 id=obj.object_id.object_id,
                 created=obj.created,
                 modified=obj.modified,
@@ -373,7 +387,7 @@ def stix_bundle(objs, mask=True):
                 number_observed=obj.number_observed,
                 objects = obs,
             )
-            objects += (m,)
+            objects += (od,)
         elif obj.object_type.name == 'report':
             created_by = None
             if obj.created_by_ref:
@@ -436,8 +450,8 @@ def stix_bundle(objs, mask=True):
             s = stix2.Sighting(
                 id=obj.object_id.object_id,
                 sighting_of_ref=obj.sighting_of_ref.object_id,
-                where_sighted_refs=[str(w.object_id) for w in obj.where_sighted_refs.all()],
-                observed_data_refs=[str(od.object_id) for od in obj.observed_data_refs.all()],
+                where_sighted_refs=[str(w.object_id.object_id) for w in obj.where_sighted_refs.all()],
+                observed_data_refs=[str(od.object_id.object_id) for od in obj.observed_data_refs.all()],
                 first_seen=obj.first_seen,
                 last_seen=obj.last_seen,
                 created=obj.created,

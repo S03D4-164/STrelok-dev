@@ -197,7 +197,70 @@ def sdo_list(request, type):
             if bulkform.is_valid():
                 input = bulkform.cleaned_data["input"]
             if input:
-                if type == "threat-actor":
+                if type == "attack-pattern":
+                    kc = None
+                    sform = KillChainForm(request.POST)
+                    if sform.is_valid():
+                        kc = sform.cleaned_data["killchain"]
+                    for line in input.split("\n"):
+                        if line:
+                            array = line.strip().split(",")
+                            if len(array) >= 1:
+                                a, created = AttackPattern.objects.get_or_create(
+                                    name=array[0],
+                                )
+                                a.kill_chain_phases.add(kc)
+                                if len(array) >= 2:
+                                    a.description = array[1]
+                                a.save()
+                elif type == "campaign":
+                    for line in input.split("\n"):
+                        if line:
+                            array = line.strip().split(",")
+                            if len(array) >= 1:
+                                c, cre = Campaign.objects.get_or_create(name=array[0])
+                                ca, cre = CampaignAlias.objects.get_or_create(name=array[0])
+                                c.aliases.add(ca)
+                                if len(array) >= 2:
+                                    for a in array[1:]:
+                                        ca, cre = CampaignAlias.objects.get_or_create(name=a)
+                                        c.aliases.add(ca)
+                                c.save()
+                elif type == "course-of-action":
+                    for line in input.split("\n"):
+                        if line:
+                            array = line.strip().split(",")
+                            if len(array) >= 1:
+                                c, cre = CourseOfAction.objects.get_or_create(
+                                    name=array[0],
+                                )
+                                if len(array) >= 2:
+                                    c.description = array[1]
+                                c.save()
+                elif type == "identity":
+                    ic = None
+                    sform = IdentityClassForm(request.POST)
+                    if sform.is_valid():
+                        ic = sform.cleaned_data["identity_class"]
+                    for line in input.split("\n"):
+                        if line:
+                            array = line.strip().split(",")
+                            if len(array) >= 1:
+                                i, cre = Identity.objects.get_or_create(
+                                    name = array[0],
+                                    identity_class = ic,
+                                )
+                                if len(array) >= 2:
+                                    if array[1]:
+                                        il, cre = IdentityLabel.objects.get_or_create(
+                                            value = array[1],
+                                        )
+                                        i.labels.add(il)
+                                if len(array) >= 3:
+                                    if array[2]:
+                                        i.description = array[2]
+                                i.save()
+                elif type == "threat-actor":
                     label = None
                     sform = ThreatActorLabelForm(request.POST)
                     if sform.is_valid():
@@ -213,8 +276,9 @@ def sdo_list(request, type):
                                     t.labels.add(l)
                                 if len(array) >= 2:
                                     for a in array[1:]:
-                                        ta, cre = ThreatActorAlias.objects.get_or_create(name=a)
-                                        t.aliases.add(ta)
+                                        if a:
+                                            ta, cre = ThreatActorAlias.objects.get_or_create(name=a)
+                                            t.aliases.add(ta)
                                 t.save()
                 elif type == "indicator":
                     sform = SelectObservableForm(request.POST)
@@ -222,27 +286,6 @@ def sdo_list(request, type):
                         property = sform.cleaned_data["property"]
                         label = sform.cleaned_data["label"]
                         bulk_create_indicator(label,property,input)
-                elif type == "identity":
-                    ic = None
-                    sform = IdentityClassForm(request.POST)
-                    if sform.is_valid():
-                        ic = sform.cleaned_data["identity_class"]
-                    for line in input.split("\n"):
-                        if line:
-                            array = line.strip().split(",")
-                            if len(array) >= 1:
-                                i, cre = Identity.objects.get_or_create(
-                                    name = array[0],
-                                    identity_class = ic,
-                                )
-                                if len(array) >= 2:
-                                    il, cre = IdentityLabel.objects.get_or_create(
-                                        value = array[1],
-                                    )
-                                    i.labels.add(il)
-                                if len(array) >= 3:
-                                    i.description = array[2]
-                                i.save()
                 elif type == "malware":
                     label = None
                     sform = MalwareLabelForm(request.POST)
@@ -284,6 +327,13 @@ def sdo_list(request, type):
     }
     if type == "report":
         c["bulkformat"] = "name,label,published,(description)"
+    elif type == "attack-pattern":
+        c["bulkformat"] = "name,(description)"
+        c["sform"] = KillChainForm()
+    elif type == "campaign":
+        c["bulkformat"] = "name,([alias,..])"
+    elif type == "course-of-action":
+        c["bulkformat"] = "name,(description)"
     elif type == "threat-actor":
         c["bulkformat"] = "name,([alias,..])"
         c["sform"] = ThreatActorLabelForm()
@@ -437,16 +487,17 @@ def sdo_view(request, id):
         if not m == Identity:    
             sdo = m.objects.get(object_id__object_id=id)
     form = getform(id.split("--")[0], instance=sdo)
+    objs = get_related_obj(sdo)
 
+    objects = []
     rels = []
     sights = []
-    objects = []
     observables = []
 
-    objs = get_related_obj(sdo)
     stix = {}
+    stix = stix_bundle(objs, mask=mask)
     try:
-        stix = stix_bundle(objs, mask=mask)
+        pass
         """
         if "objects" in stix:
             for o in stix["objects"]:
@@ -457,8 +508,8 @@ def sdo_view(request, id):
                 else:
                     objects.append(o)
         """
-    except:
-        pass
+    except Exception as e:
+        stix = str(e.message)
 
     for o in objs:
         if o.object_type.name == "relationship":
@@ -486,10 +537,12 @@ def sdo_view(request, id):
     coform = None
 
     aoform = AddObjectForm()
+    asform = SightingForm()
     if sdo.object_type.name == "identity":
-        aoform = SightingForm()
-    elif not sdo.object_type.name == "report":
+        asform.fields["where_sighted_refs"].initial = sdo
+    if not sdo.object_type.name == "report":
         aoform.fields["relation"].queryset = drs
+        #aoform.fields["relation"].required = True
         #aoform.fields["relation"].queryset = RelationshipType.objects.filter(
         #  id__in=drs.values("type")
         #)
@@ -498,7 +551,6 @@ def sdo_view(request, id):
             #ids=STIXObjectID.objects.filter(id__in=tgt)
             ids=[]
         )
-        #aoform.fields["relation"].required = True
 
     if request.method == "POST":
         print(request.POST)
@@ -509,6 +561,14 @@ def sdo_view(request, id):
                 #s = object_form_save(s, form)
                 messages.add_message(request, messages.SUCCESS, 'Updated.')
                 return redirect("/stix/"+id)
+        elif 'delete' in request.POST:
+            name = str(sdo)
+            sdo.delete()
+            messages.add_message(
+                request, messages.SUCCESS,
+                'Deleted -> ' + name
+            )
+            return redirect("/stix/"+id.split("--")[0])
         elif 'detach[]' in request.POST:
             dlist = request.POST.getlist("detach[]")
             if sdo.object_type.name == "report":
@@ -531,14 +591,6 @@ def sdo_view(request, id):
                     i.delete()
             messages.add_message(request, messages.SUCCESS, 'Removed.')
             #return redirect("/stix/"+id)
-        elif 'delete' in request.POST:
-            name = str(sdo)
-            sdo.delete()
-            messages.add_message(
-                request, messages.SUCCESS,
-                'Deleted -> ' + name
-            )
-            return redirect("/stix/"+id.split("--")[0])
         elif 'create_bulk' in request.POST:
             bform = InputForm(request.POST)
             input = None
@@ -631,28 +683,44 @@ def sdo_view(request, id):
                 dr = request.POST.get('relation')
                 if dr:
                     drs = DefinedRelationship.objects.get(id=dr)
-                    coform = getform(drs.target.name, request=request)
-                    if coform.is_valid():
-                        saved = coform.save()
-                        #saved = object_form_save(saved, coform)
-                        if saved:
-                            Relationship.objects.get_or_create(
-                                source_ref=sdo.object_id,
-                                target_ref=saved.object_id,
-                                relationship_type=drs.type,
-                            )
+                    coform = None
+                    src = None
+                    tgt = None
+                    if drs.source.name == sdo.object_type.name:
+                        coform = getform(drs.target.name, request=request)
+                        src = sdo.object_id
+                    else:
+                        coform = getform(drs.source.name, request=request)
+                        tgt = sdo.object_id
+                    if coform:
+                        if coform.is_valid():
+                            saved = coform.save()
+                            #saved = object_form_save(saved, coform)
+                            if saved:
+                                if not src:
+                                    src = saved.object_id
+                                elif not tgt:
+                                    tgt = saved.object_id
+                                if src and tgt:
+                                    Relationship.objects.get_or_create(
+                                        source_ref=src,
+                                        target_ref=tgt,
+                                        relationship_type=drs.type,
+                                    )
                             
             if saved:
                 messages.add_message(request, messages.SUCCESS,'Created -> ' + str(saved))
             return redirect("/stix/"+id)
 
         elif 'add_sight' in request.POST:
-            aoform = SightingForm(request.POST)
-            if aoform.is_valid():
-                ref = aoform.cleaned_data["sighting_of_ref"]
+            asform = SightingForm(request.POST)
+            if asform.is_valid():
+                s = asform.save()
+                """
+                ref = asform.cleaned_data["sighting_of_ref"]
                 #refs = aoform.cleaned_data["sighting_of_refs"]
-                first_seen = aoform.cleaned_data["first_seen"]
-                last_seen = aoform.cleaned_data["last_seen"]
+                first_seen = asform.cleaned_data["first_seen"]
+                last_seen = asform.cleaned_data["last_seen"]
                 #for ref in refs:
                 if ref:
                     s = Sighting.objects.create(
@@ -660,8 +728,9 @@ def sdo_view(request, id):
                         first_seen=first_seen,
                         last_seen=last_seen,
                     )
-                    s.where_sighted_refs.add(sdo.object_id)
+                    s.where_sighted_refs.add(sdo)
                     s.save()
+                """
                 messages.add_message(
                     request, messages.SUCCESS, 'Updated.'
                 )
@@ -690,7 +759,7 @@ def sdo_view(request, id):
                         if rel.source == sdo.object_type:
                             Relationship.objects.get_or_create(
                                 source_ref=sdo.object_id,
-                                relationship_type=rel.relationship_type,
+                                relationship_type=rel.type,
                                 target_ref=ref,
                             )
                         else:
@@ -723,6 +792,7 @@ def sdo_view(request, id):
         "form": form,
         "soform": soform,
         "aoform": aoform,
+        "asform": asform,
         "bform": InputForm(),
         #"selected": selected,
         "coform": coform,
