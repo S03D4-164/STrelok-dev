@@ -13,27 +13,9 @@ import stix2
 
 from django_otp.decorators import otp_required
 
-def bulk_create_indicator(label, property, input,   src=None):
-    for line in input.split("\n"):
-        if line:
-            ip, created = IndicatorPattern.objects.get_or_create(
-                property=property,
-                value=line.strip()
-            )
-            i, created = Indicator.objects.get_or_create(
-                name=line.strip()
-            )
-            i.pattern.add(ip)
-            i.labels.add(label)
-            i.save()
-            if src.object_type.name == "report":
-                src.object_refs.add(i.object_id)
-    return
-
 def get_obs(o):
     t = o.type
     if t.model_name:
-        #print(t.model_name)
         m = apps.get_model(t._meta.app_label, t.model_name)
         obs = m.objects.get(id=o.id)
         return obs
@@ -174,12 +156,12 @@ def obs2pattern(observable, new=None, indicator=None, generate=False):
                 p.observable.clear()
                 p.observable.add(*obs)
                 if generate:
-                    p.pattern = " OR ".join(sorted(pattern))
+                    p.pattern = "[" + " OR ".join(sorted(pattern)) + "]"
                     #print(p.pattern)
                 p.save()
             else: 
                 p = IndicatorPattern.objects.create(
-                    pattern = " OR ".join(sorted(pattern))
+                    pattern = "[" + " OR ".join(sorted(pattern)) + "]"
                 )
                 p.observable.add(*obs)
                 p.save()

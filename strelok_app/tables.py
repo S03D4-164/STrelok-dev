@@ -94,7 +94,7 @@ class CourseOfActionData(BaseDatatableView):
 
 class IdentityData(BaseDatatableView):
     model = Identity
-    columns = ['created', 'name', 'sectors', 'labels']
+    columns = ['modified', 'name', 'sectors', 'labels']
     order_columns = columns
     max_display_length = 100
     def render_column(self, row, column):
@@ -283,7 +283,7 @@ class SightingData(BaseDatatableView):
         elif column == 'where_sighted_refs':
             wsr = ""
             for r in row.where_sighted_refs.all():
-                o = get_obj_from_id(r.object_id)
+                o = get_obj_from_id(r.object_id.object_id)
                 wsr += "<a href=/stix/{0}>{1}</href><br>".format(r.object_id, o)
             return wsr
         elif column == 'object_id':
@@ -335,7 +335,7 @@ class IndicatorData(BaseDatatableView):
             if row.pattern:
                 pattern = row.pattern.pattern
             #pattern = " OR ".join(sorted(row.pattern.all().values_list("pattern", flat=True)))
-            return "[" + pattern + "]"
+            return pattern
         elif column == 'name':
             return '<a href="/stix/{0}">{1}</a>'.format(row.object_id.object_id,row.name)
         else:

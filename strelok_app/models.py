@@ -30,7 +30,7 @@ class STIXObjectID(models.Model):
             elif o.object_type.name == "sighting":
                 wsrs = []
                 for wsr in o.where_sighted_refs.all():
-                    w = get_obj_from_id(wsr)
+                    w = get_obj_from_id(wsr.object_id)
                     wsrs.append(w.name)
                 s = get_obj_from_id(o.sighting_of_ref)
                 if wsrs and s:
@@ -132,7 +132,7 @@ class STIXObject(models.Model):
             elif o.object_type.name == "sighting":
                 wsrs = []
                 for wsr in o.where_sighted_refs.all():
-                    w = get_obj_from_id(wsr)
+                    w = get_obj_from_id(wsr.object_id)
                     wsrs.append(w.name)
                 s = get_obj_from_id(o.sighting_of_ref)
                 if wsrs and s:

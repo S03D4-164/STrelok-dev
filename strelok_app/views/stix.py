@@ -66,7 +66,7 @@ def sight2db(sight, objs):
     if "where_sighted_refs" in sight:
         for w in sight["where_sighted_refs"]:
             sdo = objs[w]
-            wsrs.append(sdo.object_id)
+            wsrs.append(sdo)
     sor = None
     if "sighting_of_ref" in sight:
         sid = sight["sighting_of_ref"]
@@ -139,6 +139,8 @@ def _stix2property(so, obj):
         so.first_seen = obj["first_seen"]
     if "last_seen" in obj:
         so.last_seen = obj["last_seen"]
+    if "confidence" in obj:
+        so.confidence = obj["confidence"]
     return so
 
 def stix2_db(obj):
@@ -211,8 +213,7 @@ def stix2_db(obj):
             return c
         elif type == 'malware':
             m, cre = model.objects.get_or_create(name=obj["name"])
-            if "description" in obj:
-                m.description = obj["description"]
+            m = _stix2property(m, obj)
             if "labels" in obj:
                 labels = obj["labels"]
                 for label in labels: 
@@ -222,8 +223,7 @@ def stix2_db(obj):
             return m
         elif type == 'tool':
             t, cre = model.objects.get_or_create(name=obj["name"])
-            if "description" in obj:
-                t.description = obj["description"]
+            t = _stix2property(t, obj)
             if "labels" in obj:
                 labels = obj["labels"]
                 for label in labels: 
@@ -322,7 +322,7 @@ def stix_bundle(objs, mask=True):
             )
             objects += (i,)
         elif obj.object_type.name == 'indicator':
-            pattern = ""
+            pattern = "[]"
             if obj.pattern:
                 pattern = obj.pattern.pattern
             i = stix2.Indicator(
@@ -330,7 +330,7 @@ def stix_bundle(objs, mask=True):
                 name=obj.name,
                 description=obj.description,
                 labels=[str(l.value) for l in obj.labels.all()],
-                pattern= "[" + pattern + "]",
+                pattern= pattern,
                 created=obj.created,
                 modified=obj.modified,
                 valid_from=obj.valid_from,
@@ -377,7 +377,8 @@ def stix_bundle(objs, mask=True):
                     dn = DomainNameObject.objects.get(id=o.id)
                     ob = stix2.DomainName(value=dn.value)
                 if ob:
-                    obs[o.id] = json.loads(str(ob))
+                    obs[str(o.id)] = json.loads(str(ob))
+                    #obs[str(o.id)] = ob
             od = stix2.ObservedData(
                 id=obj.object_id.object_id,
                 created=obj.created,
@@ -550,7 +551,6 @@ def stix_view(request):
                             res = requests.get(url.strip())
                             if res:
                                 j = res.json()
-                                print(j)
                                 b = stix_filter(j, b, types=types, relation=relation)
                                 
                 elif 'parse_stix2' in request.POST:

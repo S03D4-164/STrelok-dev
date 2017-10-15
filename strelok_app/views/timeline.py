@@ -27,16 +27,26 @@ def timeline_view(request, id=None):
         else:
             obj = obj
     else:
-        if not obj:
-            obj = STIXObject.objects.filter(object_type__name="threat-actor")
-        for o in  obj:
-            for r in get_related_obj(o):
-                #objs.append(get_obj_from_id(o.object_id))
-                objs.append(r)
+        if obj:
+            for o in  obj:
+                for r in get_related_obj(o):
+                    objs.append(r)
+        else:
+            obj = STIXObject.objects.all()
+            """
+            obj = STIXObject.objects.filter(
+                object_type__name__in=[
+                    "threat-actor"
+                ])
+            """
+            for o in  obj:
+                objs.append(get_obj_from_id(o.object_id))
         obj = None
     from .stix import stix_bundle
     stix = stix_bundle(objs, mask=mask)
+    #print(stix)
     data = stix2timeline(json.loads(str(stix)))
+    #print(data)
     c = {
         "form": form,
         "id":id,
@@ -56,10 +66,24 @@ def find_ref(ref, stix):
             return obj
     return None
 
+def find_attr(ref, stix):
+    if not "objects" in stix:
+        return False
+    for obj in stix["objects"]:
+        if obj["type"] == "relationship":
+            if obj["relationship_type"] == "attributed-to":
+                if obj["source_ref"] == ref:
+                    return find_ref(obj["target_ref"], stix)
+    return None
+
+
 def set_group(so, data):
+    # add object to subgroup and object_type to group
     sg = {
         "id": so.id,
-        "content": "<a href=/stix/{0}>{1}</a>".format(so.id,so.name),
+        "content": "<a href=/stix/{0}>{1}</a>".format(
+            so.id,so.name
+        ),
         "group": so.type
     }
     if not sg["id"] in data["subgroups"]:
@@ -75,26 +99,50 @@ def set_group(so, data):
         data["groups"][g["id"]]["nested_groups"].append(sg["id"])
     return data
 
+def set_item(item, data):
+    item["title"] = "<div>"
+    item["title"] += " - ".join([item["start"],item["end"]])
+    item["title"] += "<br>subgroup: " + item["subgroup"]
+    item["title"] += "<br>className: " + item["className"]
+    item["title"] += "</div>"
+    if item["group"] and not item["id"] in data["items"]:
+        data["items"][item["id"]] = item
+        if item["className"] and not item["className"] in data["colors"]:
+            cc = hashlib.md5(item["className"].encode("utf8")).hexdigest()[0:6]
+            data["colors"][item["className"]] = "#" + str(cc)
+    return data
+
 def stix2timeline(stix):
-    if not "objects" in stix:
-        return None
     data = {
         "groups":{},
         "subgroups":{},
         "items":{},
         "colors":{},
     }
+    if not "objects" in stix:
+        return data
+    # map objects have timestamp
     for obj in stix["objects"]:
         if obj["type"] == "sighting":
             sighting = DotMap(obj)
             sor = sighting.sighting_of_ref
             if sor.split("--")[0] in [
-                "threat-actor", "malware","attack-pattern"
+                "attack-pattern",
+                "campaign",
+                "malware",
+                "tool",
+                #"threat-actor",
             ]:
                 so = find_ref(sor, stix)
                 if so:
                     so = DotMap(so)
-                    data = set_group(so, data)
+                    a = find_attr(sor, stix)
+                    if a:
+                        a = DotMap(a)
+                        data = set_group(a, data)
+                    #elif not so.type == "campaign":
+                    else:
+                        data = set_group(so, data)
                     wsr = sighting.where_sighted_refs
                     for w in wsr:
                         if w.split("--")[0] == "identity":
@@ -103,30 +151,26 @@ def stix2timeline(stix):
                                 tgt = DotMap(tgt)
                                 item = {
                                     "id": sighting.id,
-                                    #"content": tgt.name,
-                                    "content": "<a class='box' href=/stix/{0}>{1}</a>".format(tgt.id,tgt.name),
+                                    "content": "<a class='box' href=/stix/{0}>{1}</a>".format(
+                                        tgt.id,tgt.name
+                                    ),
                                     "group": so.id,
-                                    "start": sighting.first_seen,
+                                    #"group": None,
+                                    "subgroup": sighting.type,
                                     "className":sighting.type,
-                                    "subgroup": "",
+                                    "start": sighting.first_seen,
                                     "end": "",
                                     "title": "",
                                 }
+                                if a:
+                                    item["group"] = a.id
                                 if sighting.last_seen:
                                     item["end"] = sighting.last_seen
                                 if tgt.sectors:
                                     item["subgroup"] = tgt.sectors[0]
                                     item["className"] = tgt.sectors[0]
-                                item["title"] = "<div>"
-                                item["title"] += " - ".join([item["start"],item["end"]])
-                                item["title"] += "<br>subgroup: " + item["subgroup"]
-                                item["title"] += "<br>className: " + item["className"]
-                                item["title"] += "</div>"
-                                if not item["id"] in data["items"]:
-                                    data["items"][item["id"]] = item
-                                    if not item["className"] in data["colors"]:
-                                        cc = hashlib.md5(item["className"].encode("utf8")).hexdigest()[0:6]
-                                        data["colors"][item["className"]] = "#" + str(cc)
+                                #print(item)
+                                data = set_item(item, data)
         elif obj["type"] == "report":
             report = DotMap(obj)
             start = report.created
@@ -134,7 +178,9 @@ def stix2timeline(stix):
                 start= report.published
             item = {
                 "id": report.id,
-                "content": "<a href=/stix/{0}>{1}</a>".format(report.id,report.name),
+                "content": "<a class='box' href=/stix/{0}>{1}</a>".format(
+                    report.id,report.name
+                ),
                 "group": None,
                 "subgroup": report.type,
                 "className": report.type,
@@ -142,7 +188,6 @@ def stix2timeline(stix):
                 "end":"",
                 "title":"",
             }
-            item["title"] = " - ".join([item["start"],item["end"]])
             for ref in report.object_refs:
                 if ref.split("--")[0] == "threat-actor":
                     actor = find_ref(ref, stix)
@@ -151,138 +196,34 @@ def stix2timeline(stix):
                         data = set_group(actor, data)
                         if not item["group"]:
                             item["group"] = actor.id
-            if not item["id"] in data["items"]:
-                data["items"][item["id"]] = item
-                if not item["className"] in data["colors"]:
-                    cc = hashlib.md5(item["className"].encode("utf8")).hexdigest()[0:6]
-                    data["colors"][item["className"]] = "#" + str(cc)
+                #if ref.split("--")[0] == "campaign":
+            data = set_item(item, data)
         elif obj["type"] == "campaign":
             campaign = DotMap(obj)
             if campaign.first_seen:
+                # if type is background, subgroup and className must be empty
                 item = {
                     "id": campaign.id,
-                    "content": "<a href=/stix/{0}>{1}</a>".format(campaign.id,campaign.name),
-                    "group": None,
+                    "content": "<a href=/stix/{0}>{1}</a>".format(
+                        campaign.id,campaign.name
+                    ),
+                    #"group": None,
+                    "group": campaign.id,
+                    "subgroup": "",
+                    "className": "",
                     "start": campaign.first_seen,
-                    "end":"",
+                    "end": campaign.first_seen,
                     "title":"",
                     "type":"background",
                 }
                 if campaign.last_seen:
                     item["end"] = campaign.last_seen
-                for s in stix["objects"]:
-                    if s["type"] == "relationship":
-                        if s["relationship_type"] == "attributed-to" and s["source_ref"] == campaign.id:
-                            t = find_ref(s["target_ref"], stix)
-                            t = DotMap(t)
-                            if t.type == "threat-actor":
-                                data = set_group(t, data)
-                                if not item["group"]:
-                                    item["group"] = t.id
-                if not item["group"]:
-                    item["group"] = "campaign"
-                    if not "campaign" in data["groups"]:
-                        data["groups"]["campaign"] = {
-                            "id":"campaign",
-                            "content":"campaign",
-                        }
-                if not item["id"] in data["items"]:
-                    data["items"][item["id"]] = item
-                    #if not item["className"] in data["colors"]:
-                    #    cc = hashlib.md5(item["className"].encode("utf8")).hexdigest()[0:6]
-                    #    data["colors"][item["className"]] = "#" + str(cc)
+                a = find_attr(campaign.id, stix)
+                if a:
+                    a = DotMap(a)
+                    data = set_group(a, data)
+                    item["group"] = a.id
+                data = set_item(item, data)
 
     return data
 
-"""
-def data_timeline(request=None, model=None, field=None):
-    models = [
-        "sighting",
-        "report",
-        "campaign",
-        "intrusion_set",
-    ]
-    if model:
-        models = [model]
-    objects = STIXObject.objects.filter(
-        object_type__name__in = models
-    )
-
-    groups = []
-    items = []
-    for obj in objects:
-        if obj.object_type.name == "sighting":
-            sight = get_obj_from_id(obj.object_id)
-            sor = sight.sighting_of_ref
-            a = {}
-            if sor.object_id.split("--")[0] == "threat-actor":
-                actor = get_obj_from_id(sor)
-                act = {
-                    "id": actor.object_id.object_id,
-                    "content": actor.name,
-                }
-                if not act in groups:
-                    groups.append(act)
-            wsr = sight.where_sighted_refs.all()
-            for w in wsr:
-                if w.object_id.split("--")[0] == "identity":
-                    tgt = get_obj_from_id(w)
-                    item = {
-                        "id": sight.object_id.object_id,
-                        "content": tgt.name,
-                        "group": act["id"],
-                        "start": sight.first_seen.isoformat(),
-                        #"end": sight.last_seen.isoformat(),
-                    }
-                    if sight.last_seen:
-                        item["end"] = sight.last_seen.isoformat()
-                    if tgt.labels.all():
-                        item["subgroup"] = tgt.labels.all()[0]
-                    if tgt.sectors.all():
-                        item["className"] = tgt.sectors.all()[0]
-                    if not item in items:
-                        items.append(item)
-        if obj.object_type.name == "report":
-            report = get_obj_from_id(obj.object_id)
-            start = report.published
-            if not start:
-                start = report.created
-            item = {
-                "id": report.object_id.object_id,
-                "content": report.name,
-                "group": None,
-                "className": report.object_type.name,
-                "start": start.isoformat()
-            }
-            for ref in report.object_refs.all():
-                if ref.object_id.split("--")[0] == "threat-actor":
-                    actor = get_obj_from_id(ref)
-                    a = {
-                        "id": actor.object_id.object_id,
-                        "content": actor.name,
-                    }
-                    if not a in groups:
-                        groups.append(a)
-                    if not item["group"]:
-                        item["group"] = a["id"]
-            if not item in items:
-                items.append(item)
-    dataset = {
-        "items":items,
-        "groups":groups,
-    }
-    if not request:
-        #print(dataset)
-        return dataset
-    return JsonResponse(dataset)
-
-def viz_timeline(request, model=None, field=None):
-    data = data_timeline(model=model, field=field)
-    #form = TimelineForm()
-    c = {
-        #"form": form,
-        "items": data["items"],
-        "groups": data["groups"],
-    }
-    return render(request, "timeline_viz.html", c)
-"""

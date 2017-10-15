@@ -35,7 +35,7 @@ class CampaignForm(forms.ModelForm):
             "first_seen",
             "last_seen",
             "description",
-            "confidence",
+            #"confidence",
         ]
     def __init__(self, *args, **kwargs):
         super(CampaignForm, self).__init__(*args, **kwargs)
@@ -202,8 +202,8 @@ class ObservedDataForm(forms.ModelForm):
         self.fields["number_observed"].initial = 1
     def clean(self):
         c = self.cleaned_data
-        new = c["new_observable"]
         obs = list(c["observable_objects"].values_list("id", flat=True))
+        new = c["new_observable"]
         for line in new.split("\n"):
             if line:
                 o, p = create_obs_from_line(line)
@@ -342,7 +342,8 @@ class TimelineForm(forms.Form):
                 "threat-actor",
                 "report",
             ]
-        ),initial=STIXObjectType.objects.filter(name="threat-actor"),
+        ),
+        #),initial=STIXObjectType.objects.filter(name="threat-actor"),
         #widget=forms.CheckboxSelectMultiple(attrs={"checked":""})
         widget=forms.CheckboxSelectMultiple()
     )
@@ -394,26 +395,33 @@ class SightingForm(forms.ModelForm):
         last = c["last_seen"]
         if first and not last:
             last = first
-        new = c["observable"]
-        obs = []
+        odrs = list(c["observed_data_refs"].values_list("id", flat=True))
         # create observable objects
+        new = c["observable"]
+        oos = []
         for line in new.split("\n"):
             if line:
                 o, p = create_obs_from_line(line)
                 if o:
-                    obs.append(o.id)
+                    oos.append(o.id)
         # create observed-data and set observable objects
-        od = ObservedData.objects.create(
-            first_observed=first,
-            last_observed=last,
-            number_observed=1,
-        )
-        od.observable_objects = ObservableObject.objects.filter(id__in=obs)
-        od.save()
-        # set observed-data to sighting
-        ods = list(c["observed_data_refs"].values_list("id", flat=True))
-        ods.append(od.id)
-        c["observed_data_refs"] = ObservedData.objects.filter(id__in=ods)
+        if oos and not odrs:
+            od = ObservedData.objects.create(
+                first_observed=first,
+                last_observed=last,
+                number_observed=1,
+            )
+            od.observable_objects = ObservableObject.objects.filter(id__in=oos)
+            od.save()
+            odrs.append(od.id)
+        elif oos and odrs:
+            od = ObservedData.objects.get(id=odrs[0])
+            od.observable_objects.add(
+                ObservableObject.objects.filter(id__in=oos)
+            )
+            od.save()
+            odrs.append(od.id)
+        c["observed_data_refs"] = ObservedData.objects.filter(id__in=odrs)
         return c
 
 class MalwareLabelForm(forms.ModelForm):
@@ -587,6 +595,14 @@ def get_related_obj(so):
     if rep:
         ids += rep.values_list("object_id", flat=True)
         ids += rep.values_list("object_refs", flat=True)
+    ids = list(set(ids))
+    #print(ids)
+    additional = Relationship.objects.filter(
+            source_ref__in=ids,target_ref__in=ids
+    )
+    #print(additional)
+    if additional:
+        ids += additional.values_list("object_id", flat=True)
 
     oids = STIXObjectID.objects.filter(id__in=ids)
     for oid in oids:

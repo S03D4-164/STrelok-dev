@@ -94,9 +94,9 @@ $(document).ready(
                 }
             });
         });
-        $('#id_published').datetimepicker({format:'Y-m-d H:i'});
-        $('#id_first_seen').datetimepicker({format:'Y-m-d H:i'});
-        $('#id_last_seen').datetimepicker({format:'Y-m-d H:i'});
+        $('input#id_published').datetimepicker({format:'Y-m-d H:i'});
+        $('input#id_first_seen').datetimepicker({format:'Y-m-d H:i'});
+        $('input#id_last_seen').datetimepicker({format:'Y-m-d H:i'});
         Tablesort(document.getElementById('obj_table'));
         Tablesort(document.getElementById('rel_table'));
         Tablesort(document.getElementById('sight_table'));
@@ -267,7 +267,7 @@ $(document).ready(
 </div><!--/.modal-->
 {% endblock %}
 {% endif %}
-
+<div class="col-md-12">
 <div id="canvas-container" class="hidden">
 
 <div class="panel panel-default">
@@ -292,6 +292,7 @@ $(document).ready(
 </div><!--/.panel-body-->
 </div><!--/.panel-->
 </div><!--/#canvas-container-->
+</div>
 
 
 
@@ -319,7 +320,6 @@ $(document).ready(
 </div><!--.panel-heading-->
 
 <div id="obj_body" class="panel-collapse in">
-<!--<div id="obj_body" class="panel-collapse collapse ">-->
 
 <div class="panel-body">
 
@@ -436,7 +436,7 @@ STIX
 <th >Observables</th>
 </tr></thead>
 <tbody >
-{% for o in obj.observable_objects.all %}
+{% for o in obs %}
 <tr>
 <td><input class="object_id" type="checkbox" value="{{o.object_id}}"></td>
 <td><a href="/observable/{{o.id}}">{{o}}</td>
@@ -502,7 +502,11 @@ STIX
 </tr></thead>
 <tbody id="rel_tbody">
 {% for r in rels %}
+{% if obj.object_id != r.source_ref and obj.object_id != r.target_ref %}
+<tr style="background-color:lightyellow">
+{% else %}
 <tr>
+{% endif %}
 <td>
 <!--<a class="btn btn-default btn-xs" href="/stix/{{r.object_id.object_id}}">></a>-->
 <input class="object_id" type="checkbox" value="{{r.object_id.object_id}}">
@@ -553,7 +557,7 @@ STIX
 <tbody >
 {% for o in objects %}
 <tr>
-<td>{{o.object_type.name}}</td>
+<td><a href="/stix/{{o.object_type.name}}">{{o.object_type.name}}</a></td>
 <td><a href="/stix/{{o.object_id.object_id}}">
 {% if mask and o.object_type.name == "identity" %}{{o.object_id.object_id}}
 {% elif o.object_type.name == "observed-data" %}{{o.object_id.object_id}}
