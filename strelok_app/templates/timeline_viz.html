@@ -76,19 +76,21 @@
 <div class="panel panel-default">
 <div class="panel-heading">Timeline{% if obj %} of <a href="/stix/{{id}}">{{obj}}</a>{% endif %}</div>
 <div class="panel-body">
-
-<div class="col-md-9" id="visualization" >
 <input class="btn"  type="button" id="zoomIn" value="Zoom in"/>
 <input class="btn" type="button" id="zoomOut" value="Zoom out"/>
 <input class="btn" type="button" id="moveLeft" value="Move left"/>
 <input class="btn" type="button" id="moveRight" value="Move right"/>
+
+<div class="col-md-9" id="visualization" >
 </div>
+
 <div class="col-md-3">
+<button class="btn" data-toggle="collapse" href="#types_form">▼</button>
 <form method=post>{% csrf_token %}
-<div id="types_form">
+<div id="types_form" class="collapse">
 {{form.as_p}}
-</div>
 <input type=submit name="refresh" value="refresh">
+</div>
 </form>
 <hr>
 <h4>Legend</h4>

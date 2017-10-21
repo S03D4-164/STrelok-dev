@@ -366,6 +366,8 @@ def sdo_view(request, id):
     asform = SightingForm()
     if sdo.object_type.name == "identity":
         asform.fields["where_sighted_refs"].initial = sdo
+    else:
+        asform.fields["sighting_of_ref"].initial = sdo
     if not sdo.object_type.name == "report":
         aoform.fields["relation"].queryset = drs
         aoform.fields["objects"].choices = object_choices(

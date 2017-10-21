@@ -79,11 +79,15 @@ def find_attr(ref, stix):
 
 def set_group(so, data):
     # add object to subgroup and object_type to group
+    content = "<h4><a href=/stix/{0}>{1}</a></h4>".format(
+        so.id, so.name
+    )
+    if hasattr(so, "aliases"):
+        for a in so.aliases:
+            content += "<li>{0}</li>".format(a)
     sg = {
         "id": so.id,
-        "content": "<a href=/stix/{0}>{1}</a>".format(
-            so.id,so.name
-        ),
+        "content": content, 
         "group": so.type
     }
     if not sg["id"] in data["subgroups"]:

@@ -42,7 +42,7 @@ form.create_form select[multiple]{
 
 form.add_form select[multiple]{
     width:100%;
-    height:100px;
+    height:200px;
 }
 
 
@@ -60,5 +60,26 @@ div.modal-content {
 }
 
 a.box{
+    color:white;
+}
+
+table#ttp_table th {
+    text-align:center;
+    vertical-align:middle;
+}
+
+table#ttp_table td.malware {
+    background-color:red;
+}
+
+table#ttp_table td.attack-pattern{
+    background-color:darkorange;
+}
+
+table#ttp_table td.tool{
+    background-color:goldenrod;
+}
+
+table#ttp_table td a {
     color:white;
 }

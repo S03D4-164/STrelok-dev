@@ -284,3 +284,60 @@ def kill_chain_view(request):
         "data":data,
     }
     return render(request, 'matrix_viz.html', c)
+
+def ttp_view(request):
+    actor = []
+    sot = [
+        "attack-pattern",
+        "indicator",
+        "malware",
+        "tool",
+    ]
+    form = MatrixForm()
+    if request.method == "POST":
+        form = MatrixForm(request.POST)
+        if form.is_valid():
+            actor = form.cleaned_data["threat_actor"]
+            sot = form.cleaned_data["type"]
+            
+    type = STIXObjectType.objects.filter(
+        name__in=sot
+    )
+    objs = STIXObject.objects.filter(
+        object_type__in=type
+    )
+    #a = ThreatActor.objects.all().values_list("object_id", flat=True)
+    killchain = KillChainPhase.objects.all().order_by("id")
+    data = {}
+    for k in killchain:
+        data[k.phase_name] = {}
+    for obj in objs:
+        o = get_obj_from_id(obj.object_id)
+        if o.kill_chain_phases:
+            #print(o)
+            for kcp in o.kill_chain_phases.all():
+                rel = Relationship.objects.filter(
+                    source_ref__object_id__startswith="campaign",
+                    relationship_type__name="uses",
+                    target_ref=o.object_id,
+                )
+                c = rel.values_list("source_ref", flat=True).order_by().distinct()
+                rel = Relationship.objects.filter(
+                    source_ref__in=c,
+                    relationship_type__name="attributed-to",
+                    target_ref__object_id__startswith="threat-actor",
+                ).values_list("target_ref", flat=True).order_by().distinct()
+                if rel:
+                    #data[kcp.phase_name][o.name] = rel
+                    data[kcp.phase_name][o] = rel
+    kdict = {}
+    for k,v in data.items():
+        kdict[k] = len(v)
+    c = {
+        "killchain": killchain,
+        "kdict": kdict,
+        "actor": actor,
+        "data":data,
+        "form":form,
+    }
+    return render(request, 'ttp_view.html', c)

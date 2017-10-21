@@ -176,7 +176,6 @@ class KillChainPhase(models.Model):
         return self.phase_name
     class Meta:
         unique_together = (("kill_chain_name", "phase_name"),)
-        ordering = ["phase_name"]
 
 # SDO
 

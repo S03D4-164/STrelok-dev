@@ -283,7 +283,8 @@ class SightingData(BaseDatatableView):
         elif column == 'where_sighted_refs':
             wsr = ""
             for r in row.where_sighted_refs.all():
-                o = get_obj_from_id(r.object_id.object_id)
+                #o = get_obj_from_id(r.object_id.object_id)
+                o = get_obj_from_id(r.object_id)
                 wsr += "<a href=/stix/{0}>{1}</href><br>".format(r.object_id, o)
             return wsr
         elif column == 'object_id':

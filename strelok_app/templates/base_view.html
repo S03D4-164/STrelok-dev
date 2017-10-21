@@ -31,6 +31,11 @@ function detachObject(){
         });
     };
 };
+function datePicker(){
+        $('input#id_published').datetimepicker({format:'Y-m-d H:i'});
+        $('input#id_first_seen').datetimepicker({format:'Y-m-d H:i'});
+        $('input#id_last_seen').datetimepicker({format:'Y-m-d H:i'});
+};
 $(document).ready(
     function(){
         $("select#id_relation").change(function(){
@@ -60,6 +65,7 @@ $(document).ready(
                         cform = $(result).find("#create_object");
                         $("#create_object").replaceWith(cform);
                     };
+                    datePicker();
                 }
             });
         });
@@ -91,12 +97,11 @@ $(document).ready(
                         console.log(table);
                         $("tbody#objects_table").replaceWith(table);
                     };
+                    datePicker();
                 }
             });
         });
-        $('input#id_published').datetimepicker({format:'Y-m-d H:i'});
-        $('input#id_first_seen').datetimepicker({format:'Y-m-d H:i'});
-        $('input#id_last_seen').datetimepicker({format:'Y-m-d H:i'});
+        datePicker();
         Tablesort(document.getElementById('obj_table'));
         Tablesort(document.getElementById('rel_table'));
         Tablesort(document.getElementById('sight_table'));
@@ -325,8 +330,8 @@ $(document).ready(
 
 <table class="table table-condensed">
 {% block property %}
-{% if obj.created %}<tr><th class="col-md-3">Created</th><td>{{obj.created}}</td></tr>{% endif %}
-{% if obj.modified %}<tr><th >Modified</th><td>{{obj.modified}}</td></tr>{% endif %}
+{% if obj.created %}<tr><th class="col-md-3">Created</th><td>{{obj.created|date:"c"}}</td></tr>{% endif %}
+{% if obj.modified %}<tr><th >Modified</th><td>{{obj.modified|date:"c"}}</td></tr>{% endif %}
 {% if obj.labels %}
 <tr><th >Labels</th>
 <td>
@@ -338,10 +343,20 @@ $(document).ready(
 {% if type == "report"%}
 <tr><th >Publisher</th><td>{{obj.created_by_ref}}</td></tr>
 <tr><th >Published</th><td>{{obj.published}}</td></tr>
-{% elif type == "identity"%}
+{% endif %}
+{% if type == "identity"%}
 <tr><th >Sectors</th><td>{% for s in obj.sectors.all %}{{s}}<br>{% endfor%}</td></tr>
-{% elif type == "threat-actor" or type == "campaign" %}
+{% endif %}
+{% if type == "threat-actor" or type == "campaign" %}
 <tr><th >Alias</th><td>{% for a in obj.aliases.all %}{{a}}<br>{% endfor%}</td></tr>
+{% endif %}
+{% if type == "sighting" %}
+<tr><th >Where Sighted</th><td>{% for w in obj.where_sighted_refs.all %}
+<a href="/stix/{{w.object_id.object_id}}">{{w}}<br>{% endfor%}</td></tr>
+<tr><th >Sighting of</th><td><a href="/stix/{{obj.sighting_of_ref.object_id}}">{{obj.sighting_of_ref}}</a></td></tr>
+{% endif %}
+{% if type == "campaign" or type == "sighting" %}
+<tr><th >First/Last Seen</th><td>{{obj.first_seen|date:"c"}} -<br>{{obj.last_seen|date:"c"}}</td></tr>
 {% endif %}
 {% endblock %}
 {% if obj.description %}
@@ -393,9 +408,8 @@ STIX
 {% if user.is_authenticated %}
 <a class="btn btn-primary btn-xs" data-toggle="modal" href="#add_form">Add</a>
 <a class="btn btn-info btn-xs" data-toggle="modal" href="#create_form">Create</a>
-{% if obj.object_type.name == "identity" %}
 <a class="btn btn-info btn-xs" data-toggle="modal" href="#sight_form">Sighting</a>
-{% elif obj.object_type.name == "report" %}
+{% if obj.object_type.name == "report" %}
 <a class="btn btn-info btn-xs" data-toggle="modal" href="#bulk_form">Bulk Create</a>
 {% endif %}
 <a class="btn btn-warning btn-xs" onclick=detachObject()>Detach</a>
@@ -550,22 +564,31 @@ STIX
 
 <table id="obj_table" class="table table-condensed table-stripe table-hover display" width="100%">
 <thead><tr>
-<th data-sort-default class="col-sm-4">Type</th>
 <th class="col-sm-4">Name</th>
-<th class="col-sm-4">Label</th>
+<th data-sort-default class="col-sm-4">Type</th>
+<th class="col-sm-4">Property</th>
 </tr></thead>
 <tbody >
 {% for o in objects %}
 <tr>
-<td><a href="/stix/{{o.object_type.name}}">{{o.object_type.name}}</a></td>
 <td><a href="/stix/{{o.object_id.object_id}}">
 {% if mask and o.object_type.name == "identity" %}{{o.object_id.object_id}}
 {% elif o.object_type.name == "observed-data" %}{{o.object_id.object_id}}
 {% else %}{{o.name}}
 {% endif %}
 </a></td>
-<td>{% for l in o.labels.all %}{{l}}<br>{% endfor %}</td>
-<!--<td>{{o.object_id.object_id}}</td>-->
+<td><a href="/stix/{{o.object_type.name}}">{{o.object_type.name}}</a></td>
+<td>
+{% if o.object_type.name == "attack-pattern" %}
+{% for k in o.kill_chain_phases.all %}{{k.phase_name}}{% endfor %}
+{% elif o.object_type.name == "campaign" %}
+{% for a in o.aliases.all %}{{a.name}}<br>{% endfor %}
+{% elif o.object_type.name == "observed-data" %}
+{% for oo in o.observable_objects.all %}<a href="/observable/{{oo.id}}">{{oo}}<br>{% endfor %}
+{% else %}
+{% for l in o.labels.all %}{{l}}<br>{% endfor %}
+{% endif %}
+</td>
 </tr>
 {% endfor %}
 </tbody>

@@ -98,7 +98,7 @@ $(document).ready(
 
 {% block left_pane %}
 {% if type == "threat-actor" or type == "identity" %}
-<div id="left_pane" class="col-md-6">
+<div id="left_pane" class="col-md-7">
 {% else %}
 <div id="left_pane" class="col-md-12">
 {% endif %}
@@ -155,14 +155,14 @@ $(document).ready(
 
 {% block right_pane %}
 {% if type == "threat-actor" or type == "identity" %}
-<div id="right_pane" class="col-md-6">
+<div id="right_pane" class="col-md-5">
 <div class="panel panel-default">
 
 <div class="panel-heading">
 Stats
 </div>
 <div class="panel-body">
-<div id="container">
+<div id="container" style="height:75vh">
 </div>
 </div><!--/.panel-body-->
 </div><!--/.panel-->

@@ -383,7 +383,7 @@ class SightingForm(forms.ModelForm):
                 |Q(object_id__startswith="campaign--")\
                 |Q(object_id__startswith="attack-pattern--")\
                 |Q(object_id__startswith="intrusion-set--")\
-            )
+            ),dummy=True
         )
         self.fields["sighting_of_ref"].choices = schoices
         self.fields["observable"].required = False
@@ -398,29 +398,24 @@ class SightingForm(forms.ModelForm):
         odrs = list(c["observed_data_refs"].values_list("id", flat=True))
         # create observable objects
         new = c["observable"]
-        oos = []
         for line in new.split("\n"):
-            if line:
-                o, p = create_obs_from_line(line)
-                if o:
-                    oos.append(o.id)
-        # create observed-data and set observable objects
-        if oos and not odrs:
-            od = ObservedData.objects.create(
-                first_observed=first,
-                last_observed=last,
-                number_observed=1,
-            )
-            od.observable_objects = ObservableObject.objects.filter(id__in=oos)
-            od.save()
-            odrs.append(od.id)
-        elif oos and odrs:
-            od = ObservedData.objects.get(id=odrs[0])
-            od.observable_objects.add(
-                ObservableObject.objects.filter(id__in=oos)
-            )
-            od.save()
-            odrs.append(od.id)
+            oos = []
+            for l in line.split("|"):
+                if l:
+                    o, p = create_obs_from_line(l)
+                    if o:
+                        oos.append(o.id)
+            # create observed-data and set observable objects
+            if oos:
+                od = ObservedData.objects.create(
+                    first_observed=first,
+                    last_observed=last,
+                    number_observed=1,
+                )
+                for oo in ObservableObject.objects.filter(id__in=oos):
+                    od.observable_objects.add(oo)
+                od.save()
+                odrs.append(od.object_id.id)
         c["observed_data_refs"] = ObservedData.objects.filter(id__in=odrs)
         return c
 
@@ -527,12 +522,6 @@ has_killchain = [
 ]
 
 class MatrixForm(forms.Form):
-    zoom = forms.ChoiceField(choices=(
-        (1,1),
-        (2,2),
-        (3,3),
-        (4,4),
-    ),initial=3)
     type = forms.ModelMultipleChoiceField(
         queryset=STIXObjectType.objects.filter(
             name__in=[                          
@@ -547,13 +536,21 @@ class MatrixForm(forms.Form):
     threat_actor = forms.ModelMultipleChoiceField(
         queryset=ThreatActor.objects.all()
     )
+    """
+    zoom = forms.ChoiceField(choices=(
+        (1,1),
+        (2,2),
+        (3,3),
+        (4,4),
+    ),initial=3)
+    """
     def __init__(self, *args, **kwargs):
         super(MatrixForm, self).__init__(*args, **kwargs)
         self.fields["threat_actor"].required = False
         self.fields["type"].required = False
 
 
-def get_related_obj(so):
+def get_related_obj(so, recursive=False):
     objects = []
     ids = [so.object_id.id]
 
@@ -610,6 +607,9 @@ def get_related_obj(so):
         if obj:
             if not obj in objects:
                 objects.append(obj)
+    if recursive:
+        for o in objects:
+            objects += get_related_obj(o, recursive=False)
     return objects
 
 def object_choices(

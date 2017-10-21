@@ -8,7 +8,7 @@ from .views.stix import stix_view ,stix2_json, stix2type_json
 from .views.taxii import taxii_discovery, taxii_collection, taxii_get_objects
 #from .views.timeline import viz_timeline, data_timeline, timeline_view
 from .views.timeline import timeline_view
-from .views.chart import chart_view, kill_chain_view
+from .views.chart import chart_view, kill_chain_view, ttp_view
 #from .views.auth import logout_view
 from .tables import *
 
@@ -40,7 +40,8 @@ urlpatterns = [
     url(r'^stix/$', stix_view),
     #url(r'^stix/chart', chart_view),
     url(r'^stix/drs/$', viz_drs),
-    url(r'^stix/matrix/$', kill_chain_view),
+    #url(r'^stix/matrix/$', kill_chain_view),
+    url(r'^stix/matrix/$', ttp_view),
     url(r'^stix/(?P<id>[a-z\-]+--[0-9a-f\-]+)\.json$', stix2_json),
     url(r'^stix/(?P<id>[a-z\-]+--[0-9a-f\-]+)', sdo_view),
     url(r'^stix/all.json$', stix2_json),
