@@ -28,6 +28,24 @@ function getDataTable(type){
             "stateSave": true,
         });
 };
+function drawTgtChart(prop){
+    $.ajax({
+        type: 'GET',
+        url: '/chart/target/'+prop,
+        success: function(data){
+            tgtChart(data, prop);
+        }
+    });
+};
+function drawActorChart(prop){
+    $.ajax({
+        type: 'GET',
+        url: '/chart/threat-actor/'+prop,
+        success: function(data){
+            actorChart(data);
+        }
+    });
+};
 $(document).ready(
     function(){
         $('a[data-toggle="tab"]').on( 'shown.bs.tab', function (e) {
@@ -42,9 +60,9 @@ $(document).ready(
         $('#id_first_observed').datetimepicker({format:'Y-m-d H:i'});
         $('#id_last_observed').datetimepicker({format:'Y-m-d H:i'});
         {% if type == "threat-actor" %}
-        actorChart({{data|safe}});
+        drawActorChart('sector');
         {% elif type == "identity" %}
-        tgtChart({{data|safe}});
+        drawTgtChart('sector');
         {% endif %}
     }
 );
@@ -162,8 +180,16 @@ $(document).ready(
 Stats
 </div>
 <div class="panel-body">
-<div id="container" style="height:75vh">
+<div id="container" style="height:60vh">
 </div>
+Refresh Chart:
+{% if type == "threat-actor" %}
+<a class="btn btn-default btn-xs" onclick=drawActorChart('sector')>Sector</a>
+<a class="btn btn-default btn-xs" onclick=drawActorChart('label')>Label</a>
+{% elif type == "identity" %}
+<a class="btn btn-default btn-xs" onclick=drawTgtChart('sector')>Sector</a>
+<a class="btn btn-default btn-xs" onclick=drawTgtChart('label')>Label</a>
+{% endif%}
 </div><!--/.panel-body-->
 </div><!--/.panel-->
 </div><!--/.col-md-6-->

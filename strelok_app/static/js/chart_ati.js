@@ -1,6 +1,5 @@
 function actorChart(data){
-//data = {{data|safe}};
-subtitle = 'Click the column to view target category';
+subtitle = 'Click on a slice -> Drilldown';
 xaxis = 'Threat Actor';
 function setChart(options)  {
     chart.series[0].remove(false);
@@ -21,7 +20,7 @@ function setChart(options)  {
 };
 chart = new Highcharts.chart({
     chart: { renderTo: 'container' },
-    title: { text: 'Count of Targets by Threat Actor' },
+    title: { text: 'Threat Actor' },
     subtitle: { text: subtitle },
     credits: {"enabled":false},
     xAxis: { 

@@ -36,6 +36,7 @@ def sdo_list(request, type):
     sot = STIXObjectType.objects.get(name=type)
     form = getform(type)
     bulkform = InputForm()
+    #prop = None
     if request.method == "POST":
         if "create" in request.POST:
             form = getform(type, request=request)
@@ -195,7 +196,7 @@ def sdo_list(request, type):
     elif type == "threat-actor":
         c["bulkformat"] = "name,([alias,..])"
         c["sform"] = ThreatActorLabelForm()
-        c["data"] = stats_ati()
+        #c["data"] = stats_ati()
     elif type == "malware":
         c["bulkformat"] = "name,(description)"
         c["sform"] = MalwareLabelForm()
@@ -205,7 +206,7 @@ def sdo_list(request, type):
     elif type == "identity":
         c["bulkformat"] = "name,(label,description)"
         c["sform"] = IdentityClassForm()
-        c["data"] = cnt_tgt_by_label()
+        #c["data"] = cnt_tgt_by_label()
     elif type == "indicator":
         c["sform"] = SelectObservableForm()
     return render(request, 'base_list.html', c)

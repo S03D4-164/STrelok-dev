@@ -14,14 +14,16 @@ def timeline_view(request, id=None):
     obj = None
     objs = []
     form = TimelineForm()
+    recursive = False
     if request.method == "POST":
         form = TimelineForm(request.POST)
         if form.is_valid():
             type = form.cleaned_data["group"]
             obj = STIXObject.objects.filter(object_type__in=type)
+            recursive = form.cleaned_data["recursive"]
     if id:
         obj = STIXObject.objects.get(object_id__object_id=id)
-        objs = get_related_obj(obj)
+        objs = get_related_obj(obj,recursive=recursive)
         if obj.object_type.name == "identity" and mask == True:
             obj = obj.object_id.object_id
         else:
@@ -29,7 +31,7 @@ def timeline_view(request, id=None):
     else:
         if obj:
             for o in  obj:
-                for r in get_related_obj(o):
+                for r in get_related_obj(o, recursive=recursive):
                     objs.append(r)
         else:
             obj = STIXObject.objects.all()
@@ -44,9 +46,7 @@ def timeline_view(request, id=None):
         obj = None
     from .stix import stix_bundle
     stix = stix_bundle(objs, mask=mask)
-    #print(stix)
     data = stix2timeline(json.loads(str(stix)))
-    #print(data)
     c = {
         "form": form,
         "id":id,

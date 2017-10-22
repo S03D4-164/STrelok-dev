@@ -333,6 +333,7 @@ class TimelineForm(forms.Form):
     stack_groups = forms.BooleanField(initial=False)
     stack_subgroups = forms.BooleanField(initial=True)
     show_minor_labels = forms.BooleanField(initial=True)
+    recursive = forms.BooleanField(initial=False)
     group = forms.ModelMultipleChoiceField(
         queryset=STIXObjectType.objects.filter(
             name__in=[
@@ -353,6 +354,7 @@ class TimelineForm(forms.Form):
         self.fields["stack_groups"].required = False
         self.fields["stack_subgroups"].required = False
         self.fields["show_minor_labels"].required = False
+        self.fields["recursive"].required = False
 
 
 class SightingForm(forms.ModelForm):
@@ -607,9 +609,13 @@ def get_related_obj(so, recursive=False):
         if obj:
             if not obj in objects:
                 objects.append(obj)
-    if recursive:
+    if recursive == True:
+        rec = []
+        #print(objects)
         for o in objects:
-            objects += get_related_obj(o, recursive=False)
+            rec += get_related_obj(o, recursive=False)
+        objects += rec
+    objects = list(set(objects))
     return objects
 
 def object_choices(

@@ -8,7 +8,7 @@ from .views.stix import stix_view ,stix2_json, stix2type_json
 from .views.taxii import taxii_discovery, taxii_collection, taxii_get_objects
 #from .views.timeline import viz_timeline, data_timeline, timeline_view
 from .views.timeline import timeline_view
-from .views.chart import chart_view, kill_chain_view, ttp_view
+from .views.chart import kill_chain_view, ttp_view, target_chart, actor_chart
 #from .views.auth import logout_view
 from .tables import *
 
@@ -36,9 +36,10 @@ urlpatterns = [
     url(r'^data/observable/', ObservableObjectData.as_view()),
     url(r'^data/pattern/', IndicatorPatternData.as_view(), name="pattern_data"),
     url(r'^data/drs/$', data_drs),
+    url(r'^chart/target/(?P<cnt_by>[a-z]+)$', target_chart),
+    url(r'^chart/threat-actor/(?P<cnt_by>[a-z]+)$', actor_chart),
     #url(r'^data/timeline/$', data_timeline),
     url(r'^stix/$', stix_view),
-    #url(r'^stix/chart', chart_view),
     url(r'^stix/drs/$', viz_drs),
     #url(r'^stix/matrix/$', kill_chain_view),
     url(r'^stix/matrix/$', ttp_view),

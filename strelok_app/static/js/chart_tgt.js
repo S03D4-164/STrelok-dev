@@ -1,6 +1,6 @@
-function tgtChart(data){
-//data = {{data|safe}};
-subtitle = 'Click the column';
+function tgtChart(data, prop){
+subtitle = 'Click on a slice -> Drilldown';
+//subtitle = null;
 xaxis = 'Identity';
 function setChart(options)  {
     chart.series[0].remove(false);
@@ -21,7 +21,7 @@ function setChart(options)  {
 };
 chart = new Highcharts.chart({
     chart: { renderTo: 'container' },
-    title: { text: 'Count of Victims by Label' },
+    title: { text: 'Count of Targets by ' +  prop },
     subtitle: { text: subtitle },
     credits: {"enabled":false},
     xAxis: { 

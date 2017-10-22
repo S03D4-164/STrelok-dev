@@ -221,6 +221,24 @@ def stix2_db(obj):
                     m.labels.add(l)
             m.save()
             return m
+        elif type == 'observed-data':
+            o = model.objects.create(
+                first_observed=obj["first_observed"],
+                last_observed=obj["last_observed"],
+                number_observed=obj["number_observed"],
+            )
+            from .observables import create_obs
+            for n in obj["objects"]:
+                d= obj["objects"][n]
+                obs = None
+                if d["type"] == "file":
+                    obs = create_obs(d["type"], d["name"])
+                else:
+                    obs = create_obs(d["type"], d["value"])
+                if obs:
+                    o.observable_objects.add(obs)
+            o.save()
+            return o
         elif type == 'tool':
             t, cre = model.objects.get_or_create(name=obj["name"])
             t = _stix2property(t, obj)

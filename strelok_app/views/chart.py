@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect
+from django.http import HttpResponse, JsonResponse
 from django.db.models import Q
 
 from ..models import *
@@ -6,197 +7,143 @@ from ..forms import *
 from collections import OrderedDict
 import json, hashlib
 
-def chart_view(request):
-    data = stats_ati()
-    c = {
-        "data":data
-    }
-    return render(request, 'chart.html', c)
-
-def target_stats(rels, id=None):
-    ati = rels.filter(
-        source_ref__object_id__startswith='threat-actor',
-        relationship_type__name='targets',
-        target_ref__object_id__startswith='identity',
-    )
-    if id:
-        actor = ThreatActor.objects.get(id=id)
-        ati = ati.filter(source_ref__object_id=actor.object_id)
-    data = {}
-    for a in ati.all():
-        act = get_obj_from_id(a.source_ref)
-        if not act.name in data:
-            data[act.name] = {
-                "inner":{},
-                "value":0,
-            }
-        tgt = get_obj_from_id(a.target_ref)
-        if tgt:
-            data[act.name]["value"] += 1
-            label = tgt.labels.all()
-            if label:
-                if not label[0].value in data[act.name]["inner"]:
-                    data[act.name]["inner"][label[0].value] = 1
-                else:
-                    data[act.name]["inner"][label[0].value] += 1
-    for d in data.items():
-        d[1]["inner"] = OrderedDict(
-            sorted(
-                d[1]["inner"].items(),
-                key=lambda kv:kv[1],
-                reverse=True
-            )
+def actor_chart(request, cnt_by='sector'):
+    tgt = Identity.objects.all()
+    rels = Relationship.objects.all()
+    sights = Sighting.objects.all()
+    data = cnt_actor_from_tgt(tgt, rels, sights)
+    dataset = []
+    for d in data:
+        target = None
+        if d["name"] == "Unknown":
+            target = tgt.filter(id__in=d["id"])
+        dd = cnt_tgt_by_prop(
+            cnt_by=cnt_by,
+            actor_name=d["name"],
+            tgt=target,
+            drilldown=False,
         )
-    data = OrderedDict(
-        sorted(
-            data.items(),
-            key=lambda kv: kv[1]["value"],
-            reverse=True
-        )
-    )
-    return data
-
-def cnt_actor_by_tgt_label(label, relation):
-    # identity who has the label
-    ids = Identity.objects.filter(
-        labels__value=label
-    ).values_list('object_id')
-    # actor targets identity who has the label
-    rel = relation.filter(
-        target_ref__in=ids,
-    )
-    ac = {}
-    for r in rel.all():
-        a = get_obj_from_id(r.source_ref)
-        if not a.name in ac:
-            # filter all relation by the actor
-            f = relation.filter(
-                source_ref=a.object_id,
-                target_ref__in=ids
-            )
-            ac[a.name] = f.count()
-
-    dd = []
-    for k, v in ac.items():
-        ai = {
-            "name": k,
-            "y": v,
+        drilldown = {
+            "name": "Targets of " + d["name"],
+            "data": json.loads(dd),
         }
-        dd.append(ai)
+        da = {
+            "name":d["name"],
+            "y":d["y"],
+            "drilldown":drilldown,
+        }
+        dataset.append(da)
+    dataset = json.dumps(dataset,indent=2)
+    return HttpResponse(dataset,  content_type="application/json")
+
+def cnt_actor_from_tgt(tgt, rels, sights):
+    data = {}
+    for a in ThreatActor.objects.all():
+        data[a.name] = 0
+    unidentified = []
+    for t in tgt:
+        l = []
+        s = sights.filter(
+            where_sighted_refs__object_id=t.object_id
+        )
+        l += s.values_list("sighting_of_ref",flat=True)
+        r = rels.filter(
+            target_ref=t.object_id
+        )
+        l += r.values_list("source_ref",flat=True)
+        at = Relationship.objects.filter(
+            source_ref__in=list(set(l)),
+            relationship_type__name="attributed-to",
+            target_ref__object_id__startswith="threat-actor",
+        )
+        l += at.values_list("target_ref",flat=True)
+        ta = ThreatActor.objects.filter(object_id__in=list(set(l)))
+        if ta:
+            for a in ta:
+                data[a.name] += 1
+        else:
+            unidentified.append(t.id)
+    dd = []
+    unknown = len(tgt)
+    for k, v in data.items():
+        if v:
+            ai = {
+                "name": k,
+                "y": v,
+            }
+            dd.append(ai)
+            unknown -= v
     dd = sorted(
         dd,
         key=lambda kv: kv["y"],
         reverse=True
     )
+    if unknown:
+        dd.append({
+            "name":"Unknown",
+            "y":unknown,
+            "id":unidentified,
+        })
     return dd
 
-def stats_ati():
-    dataset = []
-    # all actor-targets-identity
-    ati = Relationship.objects.filter(
-        source_ref__object_id__startswith='threat-actor',
-        relationship_type__name='targets',
-        target_ref__object_id__startswith='identity',
-    )
+def target_chart(request, cnt_by="sector"):
+    data = cnt_tgt_by_prop(cnt_by=cnt_by)
+    return HttpResponse(data,  content_type="application/json")
 
-    # count of target by actor
-    actors = ThreatActor.objects.all()
-    for actor in actors:
-        fati = ati.filter(source_ref=actor.object_id)
-        item = {
-            "name": actor.name,
-            "y": fati.count(),
-            "drilldown":{"data": []},
-        }
-
-        # count of target category by actor
-        cntbt = {} 
-        tgts = {}
-        for a in fati.all():
-            tgt = get_obj_from_id(a.target_ref)
-            if tgt:
-                l = tgt.labels.all()
-                tcat = None
-                if l:
-                    if l[0].value:
-                        tcat = l[0].value
-                if tcat:
-                    if not tcat in cntbt:
-                        cntbt[tcat] = 1
-                    elif tcat in cntbt:
-                        cntbt[tcat] += 1
-                    if not tcat in tgts:
-                        tgts[tcat] = [tgt.object_id]
-                    elif tcat in tgts:
-                        tgts[tcat].append(tgt.object_id)
-        d = []
-        for tlabel, count in cntbt.items():
-            ti = {
-                "name": tlabel,
-                "y": count,
-                #"drilldown":{"data":[]},
-            }
-
-            dd = cnt_actor_by_tgt_label(tlabel, ati)
-            ti["drilldown"] = {
-                "name": "Threat actors targets " + tlabel,
-                "data": dd,
-            }
-            d.append(ti)
-
-        d = sorted(
-            d,
-            key=lambda kv: kv["y"],
-            reverse=True
-        )
-        item["drilldown"] = {
-            "name": "Target catagory of " + actor.name,
-            "data": d,
-        }
-
-        if item["y"]:
-            if not item in dataset:
-                dataset.append(item)
-
-    dataset = sorted(
-            dataset,
-            key=lambda kv: kv["y"],
-            reverse=True
-    )
-    dataset = json.dumps(dataset,indent=2)
-    return dataset
-
-def cnt_tgt_by_label():
+def cnt_tgt_by_prop(cnt_by="sector", actor_name=None, drilldown=True, tgt=None):
     dataset = []
     sights = Sighting.objects.filter(
-        #where_sighted_refs__object_id__startswith="identity--",
-        sighting_of_ref__object_id__startswith="threat-actor--",
+        where_sighted_refs__object_id__object_id__startswith="identity--",
+        #sighting_of_ref__object_id__startswith="threat-actor--",
     )
     rels = Relationship.objects.filter(
-        source_ref__object_id__startswith='threat-actor--',
+        #source_ref__object_id__startswith='threat-actor--',
         relationship_type__name='targets',
         target_ref__object_id__startswith='identity--',
     )
-    tgt = Identity.objects.filter(
-        Q(id__in=sights.values_list("where_sighted_refs",flat=True))|\
-        Q(id__in=rels.values_list("target_ref",flat=True)),
-    )
-    for l in IdentityLabel.objects.all():
-        cnt = tgt.filter(labels=l).count()
-        item = {
-            "name": l.value,
-            "y": cnt,
-            "drilldown":{"data": []},
-        }
-        dd = cnt_actor_by_tgt_label(l, rels)
-        item["drilldown"] = {
-            "name": "Threat actor targets" + l.value,
-            "data": dd,
-        }
-        if item["y"]:
-            if not item in dataset:
-                dataset.append(item)
-
+    if actor_name:
+        a = ThreatActor.objects.filter(name=actor_name)
+        if a.count() == 1:
+            oid = list(a.values_list("object_id", flat=True))
+            at = Relationship.objects.filter(
+                relationship_type__name="attributed-to",
+                target_ref__in=oid,
+            )
+            oid += list(at.values_list("source_ref",flat=True))    
+            sights = sights.filter(sighting_of_ref__in=oid)
+            rels = rels.filter(source_ref__in=oid)
+    if not tgt:
+        tgt = Identity.objects.filter(
+            Q(object_id__in=sights.values_list("where_sighted_refs",flat=True))|\
+            Q(object_id__in=rels.values_list("target_ref",flat=True)),
+        )
+    if cnt_by == "sector":
+        prop = IndustrySector.objects.all()
+    elif cnt_by == "label":
+        prop = IdentityLabel.objects.all()
+    for p in prop:
+        tgt_filtered = []
+        if cnt_by == "sector":
+            tgt_filtered = tgt.filter(sectors=p)
+        elif cnt_by == "label":
+            tgt_filtered = tgt.filter(labels=p)
+        if tgt_filtered:
+            cnt = tgt_filtered.count()
+            if cnt:
+                item = {
+                    "name": p.value,
+                    "y": cnt,
+                    #"drilldown":{"data": []},
+                }
+                if drilldown:
+                    item["drilldown"] = {"data": []}
+                    dd = cnt_actor_from_tgt(tgt_filtered, rels, sights)
+                    item["drilldown"] = {
+                        "name": "Threat actor targets " + p.value,
+                        "data": dd,
+                    }
+                if not item in dataset:
+                    dataset.append(item)
     dataset = sorted(
             dataset,
             key=lambda kv: kv["y"],
@@ -293,16 +240,16 @@ def ttp_view(request):
         "malware",
         "tool",
     ]
+    type = STIXObjectType.objects.filter(
+        name__in=sot
+    )
     form = MatrixForm()
     if request.method == "POST":
         form = MatrixForm(request.POST)
         if form.is_valid():
             actor = form.cleaned_data["threat_actor"]
-            sot = form.cleaned_data["type"]
+            type = form.cleaned_data["type"]
             
-    type = STIXObjectType.objects.filter(
-        name__in=sot
-    )
     objs = STIXObject.objects.filter(
         object_type__in=type
     )
