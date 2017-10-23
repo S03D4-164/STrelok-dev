@@ -123,7 +123,7 @@ def obs_view(request, id):
     }
     return render(request, 'base_view.html', c)
 
-def create_obs(type, value):
+def _create_obs(type, value):
     t = ObservableObjectType.objects.filter(name=type)
     if t.count() == 1:
         t = t[0]
@@ -134,43 +134,19 @@ def create_obs(type, value):
                     type = t,
                     name = value
                 )
-                #pattern = type + ":name="+ value
             else:
                 o, cre = m.objects.get_or_create(
                     type = t,
                     value = value
                 )
-                #pattern = type + ":value=" + value
-    #return o, pattern
     return o
 
-def create_obs_from_line(line):
+def _create_obs_from_line(line):
     o = None
     pattern = None
     type = line.strip().split(":")[0]
     value = ":".join(line.strip().split(":")[1:]).strip()
     o  = create_obs(type, value)
-    """
-    o, pattern = create_obs(type, value)
-    t = ObservableObjectType.objects.filter(name=type)
-    if t.count() == 1:
-        t = t[0]
-        if t.model_name:
-            m = apps.get_model(t._meta.app_label, t.model_name)
-            if t.name == "file":
-                o, cre = m.objects.get_or_create(
-                    type = t,
-                    name = value
-                )
-                pattern = type + ":name="+ value
-            else:
-                o, cre = m.objects.get_or_create(
-                    type = t,
-                    value = value
-                )
-                pattern = type + ":value=" + value
-    return o, pattern
-    """
     return o
 
 def obs2pattern(observable, new=None, indicator=None, generate=False):

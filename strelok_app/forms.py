@@ -157,11 +157,32 @@ class MalwareForm(forms.ModelForm):
             "description",
         ]
 
+def create_obs(type, value):
+    t = ObservableObjectType.objects.filter(name=type)
+    if t.count() == 1:
+        t = t[0]
+        if t.model_name and value:
+            m = apps.get_model(t._meta.app_label, t.model_name)
+            if t.name == "file":
+                o, cre = m.objects.get_or_create(
+                    type = t,
+                    name = value
+                )
+            else:
+                o, cre = m.objects.get_or_create(
+                    type = t,
+                    value = value
+                )
+    return o
+
 def create_obs_from_line(line):
     o = None
     pattern = None
     type = line.strip().split(":")[0]
     value = ":".join(line.strip().split(":")[1:]).strip()
+    o  = create_obs(type, value)
+    return o
+    """
     t = ObservableObjectType.objects.filter(name=type)
     if t.count() == 1:
         t = t[0]
@@ -180,6 +201,7 @@ def create_obs_from_line(line):
                 )
                 pattern = type + ":value=" + value
     return o, pattern
+    """
 
 class ObservedDataForm(forms.ModelForm):
     new_observable = forms.CharField(
@@ -205,10 +227,11 @@ class ObservedDataForm(forms.ModelForm):
         obs = list(c["observable_objects"].values_list("id", flat=True))
         new = c["new_observable"]
         for line in new.split("\n"):
-            if line:
-                o, p = create_obs_from_line(line)
-                if o:
-                    obs.append(o.id)
+            for l in line.split("|"):
+                if l:
+                    o = create_obs_from_line(l)
+                    if o:
+                        obs.append(o.id)
         c["observable_objects"] = ObservableObject.objects.filter(
             id__in=obs
         )
@@ -404,7 +427,7 @@ class SightingForm(forms.ModelForm):
             oos = []
             for l in line.split("|"):
                 if l:
-                    o, p = create_obs_from_line(l)
+                    o = create_obs_from_line(l)
                     if o:
                         oos.append(o.id)
             # create observed-data and set observable objects

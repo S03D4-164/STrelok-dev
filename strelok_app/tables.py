@@ -167,8 +167,10 @@ class ObservedDataData(BaseDatatableView):
         if column == 'object_id':
             return "<a href=/stix/{0}>{0}</href>".format(row.object_id.object_id)
         elif column == 'observable_objects':
-            results = []
+            results = ""
             for obs in row.observable_objects.all():
+                results += "<a href=/observable/{0}>{1}</href><br>".format(obs.id,obs)
+                """
                 t = obs.type.name
                 if obs.type.model_name:
                     m = apps.get_model(obs._meta.app_label, obs.type.model_name)
@@ -177,9 +179,15 @@ class ObservedDataData(BaseDatatableView):
                         results.append(t + ":" + o.name)
                     elif hasattr(o, "value"):
                         results.append(t + ":" + o.value)
+                """
             return results
         else:
             return super(ObservedDataData, self).render_column(row, column)
+    def filter_queryset(self, qs):
+        search = self.request.GET.get(u'search[value]', None)
+        if search:
+            qs = qs.filter(object_id__object_id__iregex=search)
+        return qs.distinct()
 
 class ReportData(BaseDatatableView):
     model = Report

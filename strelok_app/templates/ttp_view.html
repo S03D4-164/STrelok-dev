@@ -1,0 +1,73 @@
+{% extends "base_list.html" %}
+
+{% block title %}
+<title>Attack Pattern</title>
+{% endblock %}
+
+{% block visjslib %}{% endblock %}
+{% block datatableslib %}{% endblock %}
+{% block datatimepickerlib %}{% endblock %}
+{% block jquery %}
+{% endblock%}
+
+
+{% block left_pane %}{% endblock %}
+{% block right_pane %}
+<div id="right_pane" class="col-md-12" >
+<div class="panel panel-default">
+
+<div class="panel-heading">
+TTP Matrix
+</div>
+<div class="panel-body">
+
+<div class="col-md-9">
+<table id="ttp_table" class="table table-borderd">
+<thead><tr>
+<th colspan="2">Kill Chain Phase</th>
+{% for a in actor %}<th><a href="/stix/{{a.object_id.object_id}}">{{a}}</th>{% endfor%}
+</tr></thead>
+<tbody>
+{% for c in killchain %}<tr>
+{% for k,v in kdict.items %}{% if k == c.phase_name %}
+<th rowspan="{% if not v %}1{% else %}{{v}}{% endif %}">{{c.phase_name|capfirst}}</th>
+{% endif %}{% endfor %}
+{% for pn,d in data.items %}
+{% if pn == c.phase_name %}
+{% if not d%}
+<td></td>{% for a in actor%}<td></td>{% endfor %}
+{% else %}
+{% for k, v in d.items %}
+<td class="{{k.object_type.name}}"><a href="/stix/{{k.object_id.object_id}}">{{k}}</a></td>
+{% for a in actor%}
+<td style="background-color:
+{% for i in v %}
+{% if a.id == i %}lightblue;{% endif %}
+{% endfor %}
+">
+</td>
+{% endfor %}
+</tr>
+{% endfor %}
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<div class="col-md-3">
+<form class="create_form" method=post>{% csrf_token %}
+<table class="table table_condensed">
+{{form.as_table}}
+</table>
+<input type=submit name="refresh" value="refresh">
+</form>
+</div>
+
+</div>
+</div><!--/.panel-body-->
+</div><!--/.panel-->
+</div><!--/.col-md-6-->
+{% endblock %}
