@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html>
 
 <head>
@@ -23,7 +22,7 @@
 <script src='/static/tablesort/dist/tablesort.min.js'></script>
 {% endblock %}
 {% block visjslib %}
-<link href="/static/vis/dist/vis.min.css" type="text/css" rel="stylesheet"></link>
+<link href="/static/vis/dist/vis.min.css" type="text/css" rel="stylesheet">
 <script type="text/javascript" src="/static/vis/dist/vis.min.js"></script>
 <script type="text/javascript" src="/static/js/visnetwork.js"></script>
 {% endblock %}
@@ -32,7 +31,6 @@
 </head>
 
 <body style="overflow-y:scroll">
-
 <div class="container-fluid" >
 
 {% block header %}
@@ -76,8 +74,7 @@ STIX Relationship Object<span class="caret"></span></a>
 </ul>
 
 <ul class="nav navbar-nav navbar-right">
-{% if not user.is_authenticated  %}
-<li><a href="/account/login/?next={{request.path}}">Login</a></li>
+{% if not user.is_authenticated %}<li><a href="/account/login/?next={{request.path}}">Login</a></li>
 {% else %}
 <li class="dropdown">
 <a class="dropdown-toggle" data-toggle="dropdown" href="#">User: {{user}}
@@ -89,6 +86,7 @@ STIX Relationship Object<span class="caret"></span></a>
 {% if user.is_staff %}
 <li><a href="/admin/">Admin</a></li>
 <li><a href="/stix/all.json">Export All</a></li>
+<li><a href="/stix/masked-all.json">Export Masked</a></li>
 {% endif %}
 {% endif %}
 </ul>
@@ -96,22 +94,13 @@ STIX Relationship Object<span class="caret"></span></a>
 </nav>
 {% endblock %}
 
-{% block message %}
-{% if messages %}
-<div class="col-md-12">
-<ul class="messages list-group">
-{% for message in messages %}
+{% block message %}{% if messages %}<div class="col-md-12">
+<ul class="messages list-group">{% for message in messages %}
 <li{% if message.tags %} class="list-group-item list-group-item-{{ message.tags }}"{% endif %}>{{ message }}</li>
-{% endfor %}
-</ul>
-</div>
-{% endif %}
-{% endblock %}
+{% endfor %}</ul>
+</div>{% endif %}{% endblock %}
 
 {% block container %}{% endblock %}
-
-
 </div><!--/.container-fluid-->
-
 </body>
 </html>

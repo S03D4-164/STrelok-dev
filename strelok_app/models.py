@@ -172,10 +172,12 @@ def _set_id(obj, name):
 class KillChainPhase(models.Model):
     kill_chain_name = models.CharField(max_length=250)
     phase_name = models.CharField(max_length=250)
+    seq = models.SmallIntegerField(default=1)
     def __str__(self):
         return self.phase_name
     class Meta:
         unique_together = (("kill_chain_name", "phase_name"),)
+        ordering = ["seq"]
 
 # SDO
 

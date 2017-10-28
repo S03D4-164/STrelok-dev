@@ -18,9 +18,15 @@ table{
     table-layout:fixed;
 }
 
-textarea{
-    height:100px;
+textarea {
     width:100%;
+}
+textarea#id_description{
+    height:100px;
+}
+
+textarea#id_input{
+    height:60%;
 }
 
 div.modal-body table{
@@ -33,6 +39,14 @@ div.modal-body th{
 
 div.modal-body input[type="text"] {
     width:100%;
+}
+
+div.modal-dialog {
+    width: 50%;
+}
+
+div.modal-content {
+    width: 100%;
 }
 
 form.create_form select[multiple]{
@@ -51,13 +65,6 @@ div#network {
     border: 1px solid lightgray;
 }
 
-div.modal-dialog {
-    width: 600px;
-}
-
-div.modal-content {
-    width: 600px;
-}
 
 a.box{
     color:white;

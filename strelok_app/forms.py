@@ -83,7 +83,6 @@ class IdentityForm(forms.ModelForm):
         self.fields["new_label"].required = False
     def clean(self):
         c = self.cleaned_data
-        #name = c["name"]
         new = c["new_label"]
         labels = list(c["labels"].values_list("id", flat=True))
         if new:
@@ -98,9 +97,7 @@ class IdentityForm(forms.ModelForm):
 
 class IndicatorForm(forms.ModelForm):
     observable = forms.CharField(
-        widget=forms.Textarea(
-            attrs={'style':'height:100px;'}
-        )
+        widget=forms.Textarea()
     )
     class Meta:
         model = Indicator
@@ -159,6 +156,7 @@ class MalwareForm(forms.ModelForm):
 
 def create_obs(type, value):
     t = ObservableObjectType.objects.filter(name=type)
+    o = None
     if t.count() == 1:
         t = t[0]
         if t.model_name and value:
@@ -182,32 +180,10 @@ def create_obs_from_line(line):
     value = ":".join(line.strip().split(":")[1:]).strip()
     o  = create_obs(type, value)
     return o
-    """
-    t = ObservableObjectType.objects.filter(name=type)
-    if t.count() == 1:
-        t = t[0]
-        if t.model_name:
-            m = apps.get_model(t._meta.app_label, t.model_name)
-            if t.name == "file":
-                o, cre = m.objects.get_or_create(
-                    type = t,
-                    name = value
-                )
-                pattern = type + ":name="+ value
-            else:
-                o, cre = m.objects.get_or_create(
-                    type = t,
-                    value = value
-                )
-                pattern = type + ":value=" + value
-    return o, pattern
-    """
 
 class ObservedDataForm(forms.ModelForm):
     new_observable = forms.CharField(
-        widget=forms.Textarea(
-            attrs={'style':'height:100px;'}
-        )
+        widget=forms.Textarea()
     )
     class Meta:
         model = ObservedData
@@ -256,9 +232,6 @@ class ReportForm(forms.ModelForm):
         super(ReportForm, self).__init__(*args, **kwargs)
         self.fields["created_by_ref"].choices = object_choices(
             ids=identity_oid,
-            #ids=STIXObjectID.objects.filter(
-            #    object_id__startswith="identity--",
-            #),
             dummy=True
         )
 
@@ -353,9 +326,9 @@ class TimelineForm(forms.Form):
         ("box","box"),
         ("","default")
     ),initial="point")
-    stack_groups = forms.BooleanField(initial=False)
+    stack_groups = forms.BooleanField(initial=True)
     stack_subgroups = forms.BooleanField(initial=True)
-    show_minor_labels = forms.BooleanField(initial=True)
+    #show_minor_labels = forms.BooleanField(initial=True)
     recursive = forms.BooleanField(initial=False)
     group = forms.ModelMultipleChoiceField(
         queryset=STIXObjectType.objects.filter(
@@ -366,9 +339,7 @@ class TimelineForm(forms.Form):
                 "threat-actor",
                 "report",
             ]
-        ),
-        #),initial=STIXObjectType.objects.filter(name="threat-actor"),
-        #widget=forms.CheckboxSelectMultiple(attrs={"checked":""})
+        ),initial=STIXObjectType.objects.filter(name="threat-actor"),
         widget=forms.CheckboxSelectMultiple()
     )
     def __init__(self, *args, **kwargs):
@@ -376,7 +347,7 @@ class TimelineForm(forms.Form):
         self.fields["group"].required = False
         self.fields["stack_groups"].required = False
         self.fields["stack_subgroups"].required = False
-        self.fields["show_minor_labels"].required = False
+        #self.fields["show_minor_labels"].required = False
         self.fields["recursive"].required = False
 
 
@@ -458,12 +429,14 @@ class ReportLabelForm(forms.Form):
     )
 
 class ThreatActorLabelForm(forms.ModelForm):
-    #new_label = forms.CharField()
     class Meta:
         model = ThreatActor
         fields = [
             "labels",
         ]
+    def __init__(self, *args, **kwargs):
+        super(ThreatActorLabelForm, self).__init__(*args, **kwargs)
+        self.fields["labels"].required = True
 
 class ToolLabelForm(forms.ModelForm):
     class Meta:
@@ -534,9 +507,7 @@ class TypeSelectForm(forms.Form):
 
 class InputForm(forms.Form):
     input = forms.CharField(
-        widget=forms.Textarea(
-            attrs={'style':'height:200px;'}
-        )
+        widget=forms.Textarea()
     )
 
 has_killchain = [                          

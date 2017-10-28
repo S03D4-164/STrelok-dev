@@ -9,8 +9,11 @@ from .timeline import stix2timeline
 import re, json, requests
 import stix2
 
-def stix2_json(request, id=None):
-    mask = True
+def stix2_json_masked(request):
+    res = stix2_json(request, mask=True)
+    return res
+
+def stix2_json(request, id=None, mask=True):
     if request.user.is_authenticated():
         mask = False
     objs = []
@@ -67,6 +70,11 @@ def sight2db(sight, objs):
         for w in sight["where_sighted_refs"]:
             sdo = objs[w]
             wsrs.append(sdo)
+    ods = []
+    if "observed_data_refs" in sight:
+        for o in sight["observed_data_refs"]:
+            sdo = objs[o]
+            ods.append(sdo)
     sor = None
     if "sighting_of_ref" in sight:
         sid = sight["sighting_of_ref"]
@@ -91,10 +99,13 @@ def sight2db(sight, objs):
                 last_seen=last_seen,
                 sighting_of_ref=sor.object_id,
             )
-            for wsr in wsrs:
-                #s.where_sighted_refs.add(wsr.object_id)
-                s.where_sighted_refs.add(wsr)
-                s.save()
+        elif s.count() == 1:
+            s = s[0]
+        for od in ods:
+            s.observed_data_refs.add(od)
+        for wsr in wsrs:
+            s.where_sighted_refs.add(wsr)
+        s.save()
         return s
     return None
 
@@ -289,22 +300,28 @@ def stix2killchain(obj):
 def stix_bundle(objs, mask=True):
     objects = ()
     for obj in objs:
-        id = obj.object_id.object_id
+        oid = obj.object_id.object_id
         if obj.object_type.name == 'attack-pattern':
+            dscr = obj.description
+            if mask:
+                dscr = ""
             a = stix2.AttackPattern(
-                id=obj.object_id.object_id,
+                id=oid,
                 name=obj.name,
-                description=obj.description,
+                description=dscr,
                 created=obj.created,
                 modified=obj.modified,
                 kill_chain_phases=stix2killchain(obj),
             )
             objects += (a,)
         elif obj.object_type.name == 'campaign':
+            dscr = obj.description
+            if mask:
+                dscr = ""
             c = stix2.Campaign(
-                id=obj.object_id.object_id,
+                id=oid,
                 name=obj.name,
-                description=obj.description,
+                description=dscr,
                 aliases=[str(a.name) for a in obj.aliases.all()],
                 created=obj.created,
                 modified=obj.modified,
@@ -313,20 +330,26 @@ def stix_bundle(objs, mask=True):
             )
             objects += (c,)
         elif obj.object_type.name == 'course-of-action':
+            dscr = obj.description
+            if mask:
+                dscr = ""
             c = stix2.CourseOfAction(
-                id=obj.object_id.object_id,
+                id=oid,
                 name=obj.name,
-                description=obj.description,
+                description=dscr,
                 created=obj.created,
                 modified=obj.modified,
             )
             objects += (c,)
         elif obj.object_type.name == 'identity':
             name = obj.name
-            description=obj.description
+            dscr=obj.description
             if mask:
                 name = id
-                description=""
+                label = obj.labels.all()
+                if label.count() >=1:
+                    name = label[0].value + '-' + str(obj.id)
+                dscr=""
             i = stix2.Identity(
                 #id=obj.object_id.object_id,
                 id=id,
@@ -341,10 +364,10 @@ def stix_bundle(objs, mask=True):
             objects += (i,)
         elif obj.object_type.name == 'indicator':
             pattern = "[]"
-            if obj.pattern:
+            if not mask and obj.pattern:
                 pattern = obj.pattern.pattern
             i = stix2.Indicator(
-                id=obj.object_id.object_id,
+                id=oid,
                 name=obj.name,
                 description=obj.description,
                 labels=[str(l.value) for l in obj.labels.all()],
@@ -356,10 +379,13 @@ def stix_bundle(objs, mask=True):
             )
             objects += (i,)
         elif obj.object_type.name == 'intrusion-set':
+            dscr = obj.description
+            if mask:
+                dscr = ""
             i = stix2.IntrusionSet(
-                id=obj.object_id.object_id,
+                id=oid,
                 name=obj.name,
-                description=obj.description,
+                description=dscr,
                 aliases=[str(a.name) for a in obj.aliases.all()],
                 created=obj.created,
                 modified=obj.modified,
@@ -368,10 +394,13 @@ def stix_bundle(objs, mask=True):
             )
             objects += (i,)
         elif obj.object_type.name == 'malware':
+            dscr = obj.description
+            if mask:
+                dscr = ""
             m = stix2.Malware(
-                id=obj.object_id.object_id,
+                id=oid,
                 name=obj.name,
-                description=obj.description,
+                description=dscr,
                 labels=[str(l.value) for l in obj.labels.all()],
                 created=obj.created,
                 modified=obj.modified,
@@ -394,11 +423,11 @@ def stix_bundle(objs, mask=True):
                 elif o.type.name == "domain-name":
                     dn = DomainNameObject.objects.get(id=o.id)
                     ob = stix2.DomainName(value=dn.value)
-                if ob:
+                if ob and not mask:
                     obs[str(o.id)] = json.loads(str(ob))
                     #obs[str(o.id)] = ob
             od = stix2.ObservedData(
-                id=obj.object_id.object_id,
+                id=oid,
                 created=obj.created,
                 modified=obj.modified,
                 first_observed=obj.first_observed,
@@ -411,11 +440,14 @@ def stix_bundle(objs, mask=True):
             created_by = None
             if obj.created_by_ref:
                 created_by=obj.created_by_ref.object_id
+            dscr = obj.description
+            if mask:
+                dscr = ""
             r = stix2.Report(
-                id=obj.object_id.object_id,
+                id=oid,
                 labels=[str(l.value) for l in obj.labels.all()],
                 name=obj.name,
-                description=obj.description,
+                description=dscr,
                 published=obj.published,
                 object_refs=[str(r.object_id) for r in obj.object_refs.all()],
                 created_by_ref=created_by,
@@ -424,10 +456,13 @@ def stix_bundle(objs, mask=True):
             )
             objects += (r,)
         elif obj.object_type.name == 'threat-actor':
+            dscr = obj.description
+            if mask:
+                dscr = ""
             t = stix2.ThreatActor(
-                id=obj.object_id.object_id,
+                id=oid,
                 name=obj.name,
-                description=obj.description,
+                description=dscr,
                 labels=[str(l.value) for l in obj.labels.all()],
                 aliases=[str(a.name) for a in obj.aliases.all()],
                 created=obj.created,
@@ -435,10 +470,13 @@ def stix_bundle(objs, mask=True):
             )
             objects += (t,)
         elif obj.object_type.name == 'tool':
+            dscr = obj.description
+            if mask:
+                dscr = ""
             t = stix2.Tool(
-                id=obj.object_id.object_id,
+                id=oid,
                 name=obj.name,
-                description=obj.description,
+                description=dscr,
                 labels=[str(l.value) for l in obj.labels.all()],
                 created=obj.created,
                 modified=obj.modified,
@@ -446,19 +484,25 @@ def stix_bundle(objs, mask=True):
             )
             objects += (t,)
         elif obj.object_type.name == 'vulnerability':
+            dscr = obj.description
+            if mask:
+                dscr = ""
             v = stix2.Vulnerability(
-                id=obj.object_id.object_id,
+                id=oid,
                 name=obj.name,
-                description=obj.description,
+                description=dscr,
                 created=obj.created,
                 modified=obj.modified,
             )
             objects += (v,)
         elif obj.object_type.name == 'relationship':
+            dscr = obj.description
+            if mask:
+                dscr = ""
             r = stix2.Relationship(
-                id=obj.object_id.object_id,
+                id=oid,
                 relationship_type=obj.relationship_type.name,
-                description=obj.description,
+                description=dscr,
                 source_ref=obj.source_ref.object_id,
                 target_ref=obj.target_ref.object_id,
                 created=obj.created,
@@ -467,7 +511,7 @@ def stix_bundle(objs, mask=True):
             objects += (r,)
         elif obj.object_type.name == 'sighting':
             s = stix2.Sighting(
-                id=obj.object_id.object_id,
+                id=oid,
                 sighting_of_ref=obj.sighting_of_ref.object_id,
                 where_sighted_refs=[str(w.object_id.object_id) for w in obj.where_sighted_refs.all()],
                 observed_data_refs=[str(od.object_id.object_id) for od in obj.observed_data_refs.all()],

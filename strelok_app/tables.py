@@ -1,4 +1,5 @@
 from django_datatables_view.base_datatable_view import BaseDatatableView
+from django.utils.html import escape
 from django.apps import apps
 from .models import *
 from .forms import *
@@ -8,29 +9,33 @@ def _get_row_from_column(column, row):
     if column == 'id':
         return '<a class="btn btn-default btn-xs">{0}</button>'.format(row.id)
     elif column == 'name':
-        return '<a href="/stix/{0}">{1}</a>'.format(row.object_id.object_id,row.name)
+        n = escape(row.name)
+        return '<a href="/stix/{0}">{1}</a>'.format(row.object_id.object_id,n)
     elif column == 'aliases':
         a = []
         for alias in row.aliases.all():
-            if not alias.name in a:
-                a.append(alias.name)
+            n = escape(alias.name)
+            if not n in a:
+                a.append(n)
         return " / ".join(a)
     elif column == 'kill_chain_phases':
         k = []
         for kcp in row.kill_chain_phases.all():
-            if not kcp.phase_name in k:
-                k.append(kcp.phase_name)
+            n = escape(kcp.phase_name)
+            if not n in k:
+                k.append(n)
         return " / ".join(k)
     elif column == 'labels':
         l = []
         for label in row.labels.all():
-            if not label.value in l:
-                l.append(label.value)
+            v = escape(label.value)
+            if not v in l:
+                l.append(v)
         return " / ".join(l)
     elif column == 'publisher':
         p = Identity.objects.filter(object_id=row.created_by_ref)
         if p.count() == 1:
-            return p[0].name
+            return escape(p[0].name)
         else:
             return None
     elif column == 'object_refs':
@@ -40,7 +45,7 @@ def _get_row_from_column(column, row):
         if row.created_by_ref:
             c = get_obj_from_id(row.created_by_ref)
             name = c.name
-        return name
+        return escape(name)
     return False
 
 class AttackPatternData(BaseDatatableView):
@@ -91,6 +96,12 @@ class CourseOfActionData(BaseDatatableView):
             return super(CourseOfActionData, self).render_column(row, column)
         else:
             return result
+    def filter_queryset(self, qs):
+        search = self.request.GET.get(u'search[value]', None)
+        if search:
+            qs = qs.filter(description__iregex=search) \
+                | qs.filter(name__iregex=search)
+        return qs.distinct()
 
 class IdentityData(BaseDatatableView):
     model = Identity
@@ -99,19 +110,22 @@ class IdentityData(BaseDatatableView):
     max_display_length = 100
     def render_column(self, row, column):
         if column == 'name':
+            n = escape(row.name)
             if self.request.user.is_authenticated():
-                return '<a href="/stix/{0}">{1}</a>'.format(row.object_id.object_id,row.name)
+                return '<a href="/stix/{0}">{1}</a>'.format(row.object_id.object_id,n)
             else:
-                return '<a href="/stix/{0}">{0}</a>'.format(row.object_id.object_id,row.name)
+                return '<a href="/stix/{0}">{0}</a>'.format(row.object_id.object_id)
         elif column == 'labels':
             l = ""
             for label in row.labels.all():
-                l += label.value+"<br>"
+                v = escape(label.value)
+                l += v+"<br>"
             return l
         elif column == 'sectors':
             s = ""
             for sector in row.sectors.all():
-                s += sector.value+"<br>"
+                v = escape(sector.value)
+                s += v+"<br>"
             return s
         else:
             return super(IdentityData, self).render_column(row, column)
@@ -169,24 +183,21 @@ class ObservedDataData(BaseDatatableView):
         elif column == 'observable_objects':
             results = ""
             for obs in row.observable_objects.all():
-                results += "<a href=/observable/{0}>{1}</href><br>".format(obs.id,obs)
-                """
-                t = obs.type.name
-                if obs.type.model_name:
-                    m = apps.get_model(obs._meta.app_label, obs.type.model_name)
-                    o = m.objects.get(id=obs.id)
-                    if hasattr(o, "name"):
-                        results.append(t + ":" + o.name)
-                    elif hasattr(o, "value"):
-                        results.append(t + ":" + o.value)
-                """
+                o = escape(str(obs))
+                results += "<a href=/observable/{0}>{1}</href><br>".format(obs.id,o)
             return results
         else:
             return super(ObservedDataData, self).render_column(row, column)
     def filter_queryset(self, qs):
         search = self.request.GET.get(u'search[value]', None)
+        ids = []
         if search:
-            qs = qs.filter(object_id__object_id__iregex=search)
+            for q in qs.all():
+                for o in q.observable_objects.all():
+                    if search in str(o):
+                        ids.append(q.id)
+            qs = qs.filter(id__in=ids) \
+                | qs.filter(object_id__object_id__iregex=search)
         return qs.distinct()
 
 class ReportData(BaseDatatableView):
@@ -258,6 +269,12 @@ class VulnerabilityData(BaseDatatableView):
             return super(VulnerabilityData, self).render_column(row, column)
         else:
             return result
+    def filter_queryset(self, qs):
+        search = self.request.GET.get(u'search[value]', None)
+        if search:
+            qs = qs.filter(description__iregex=search) \
+                | qs.filter(name__iregex=search)
+        return qs.distinct()
 
 # SRO
 class RelationshipData(BaseDatatableView):
@@ -268,16 +285,32 @@ class RelationshipData(BaseDatatableView):
     def render_column(self, row, column):
         if column == 'source_ref':
             o = get_obj_from_id(row.source_ref)
+            if o:
+                o = escape(str(o))
             return "<a href=/stix/{0}>{1}</href>".format(row.object_id.object_id, o)
         elif column == 'target_ref':
             o = get_obj_from_id(row.target_ref)
+            if o:
+                o = escape(str(o))
             return "<a href=/stix/{0}>{1}</href>".format(row.object_id.object_id, o)
         elif column == 'relationship_type':
-            return row.relationship_type.name
+            return escape(row.relationship_type.name)
         elif column == 'object_id':
             return "<a href=/stix/{0}>{1}</href>".format(row.object_id.object_id, row.object_id.object_id)
         else:
             return super(RelationshipData, self).render_column(row, column)
+    def filter_queryset(self, qs):
+        search = self.request.GET.get(u'search[value]', None)
+        ids = []
+        if search:
+            for q in qs.all():
+                obj = get_related_obj(q)
+                for o in obj:
+                    if search in str(o):
+                        ids.append(q.id)
+            qs = qs.filter(id__in=ids) \
+                | qs.filter(relationship_type__name__iregex=search)
+        return qs.distinct()
 
 class SightingData(BaseDatatableView):
     model = Sighting
@@ -287,18 +320,32 @@ class SightingData(BaseDatatableView):
     def render_column(self, row, column):
         if column == 'sighting_of_ref':
             o = get_obj_from_id(row.sighting_of_ref)
+            if o:
+                o = escape(str(o))
             return "<a href=/stix/{0}>{1}</href>".format(row.object_id.object_id, o)
         elif column == 'where_sighted_refs':
             wsr = ""
             for r in row.where_sighted_refs.all():
-                #o = get_obj_from_id(r.object_id.object_id)
                 o = get_obj_from_id(r.object_id)
+                if o:
+                    o = escape(str(o))
                 wsr += "<a href=/stix/{0}>{1}</href><br>".format(r.object_id, o)
             return wsr
         elif column == 'object_id':
             return "<a href=/stix/{0}>{1}</href>".format(row.object_id.object_id, row.object_id.object_id)
         else:
             return super(SightingData, self).render_column(row, column)
+    def filter_queryset(self, qs):
+        search = self.request.GET.get(u'search[value]', None)
+        ids = []
+        if search:
+            for q in qs.all():
+                obj = get_related_obj(q)
+                for o in obj:
+                    if search in str(o):
+                        ids.append(q.id)
+            qs = qs.filter(id__in=ids)
+        return qs.distinct()
 
 class ObservableObjectData(BaseDatatableView):
     model = ObservableObject
@@ -344,9 +391,10 @@ class IndicatorData(BaseDatatableView):
             if row.pattern:
                 pattern = row.pattern.pattern
             #pattern = " OR ".join(sorted(row.pattern.all().values_list("pattern", flat=True)))
-            return pattern
+            return escape(pattern)
         elif column == 'name':
-            return '<a href="/stix/{0}">{1}</a>'.format(row.object_id.object_id,row.name)
+            n = escape(row.name)
+            return '<a href="/stix/{0}">{1}</a>'.format(row.object_id.object_id,n)
         else:
             return super(IndicatorData, self).render_column(row, column)
     def filter_queryset(self, qs):

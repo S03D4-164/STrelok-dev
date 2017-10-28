@@ -8,9 +8,10 @@ from collections import OrderedDict
 import json, hashlib
 
 def actor_chart(request, cnt_by='sector'):
-    tgt = Identity.objects.all()
-    rels = Relationship.objects.all()
     sights = Sighting.objects.all()
+    #tgt = Identity.objects.all()
+    tgt = Identity.objects.filter(object_id__in=sights.values("where_sighted_refs"))
+    rels = Relationship.objects.all()
     data = cnt_actor_from_tgt(tgt, rels, sights)
     dataset = []
     for d in data:
@@ -41,6 +42,7 @@ def cnt_actor_from_tgt(tgt, rels, sights):
     for a in ThreatActor.objects.all():
         data[a.name] = 0
     unidentified = []
+    unknown = len(tgt)
     for t in tgt:
         l = []
         s = sights.filter(
@@ -51,20 +53,22 @@ def cnt_actor_from_tgt(tgt, rels, sights):
             target_ref=t.object_id
         )
         l += r.values_list("source_ref",flat=True)
-        at = Relationship.objects.filter(
-            source_ref__in=list(set(l)),
-            relationship_type__name="attributed-to",
-            target_ref__object_id__startswith="threat-actor",
-        )
-        l += at.values_list("target_ref",flat=True)
-        ta = ThreatActor.objects.filter(object_id__in=list(set(l)))
-        if ta:
-            for a in ta:
-                data[a.name] += 1
+        if l:
+            at = Relationship.objects.filter(
+                source_ref__in=list(set(l)),
+                relationship_type__name="attributed-to",
+                target_ref__object_id__startswith="threat-actor",
+            )
+            l += at.values_list("target_ref",flat=True)
+            ta = ThreatActor.objects.filter(object_id__in=list(set(l)))
+            if ta:
+                for a in ta:
+                    data[a.name] += 1
+            else:
+                unidentified.append(t.id)
         else:
-            unidentified.append(t.id)
+            unknown -= 1
     dd = []
-    unknown = len(tgt)
     for k, v in data.items():
         if v:
             ai = {

@@ -123,8 +123,8 @@ $(document).ready(
 <div class="modal-body">
 <h3>Are you sure?</h3>
 <form method="post">{% csrf_token %}
-<input class="btn btn-xs btn-danger" type="submit" name="delete" value="Yes, Delete">
 <button class="btn btn-md btn-primary" data-dismiss="modal">No, Close</button>
+<input class="btn btn-md btn-danger" type="submit" name="delete" value="Yes, Delete">
 </form>
 </div><!--/.modal-body-->
 </div><!--/.modal-content-->
@@ -299,11 +299,8 @@ $(document).ready(
 </div><!--/#canvas-container-->
 </div>
 
-
-
 {% block left_pane %}
 <div id="view" class="col-md-6">
-
 <div id="obj_panel" class="panel panel-default">
 <div class="panel-heading">
 <a href="/stix/{{type}}" >{{type|capfirst}}</a>
@@ -347,7 +344,7 @@ $(document).ready(
 {% if type == "identity"%}
 <tr><th >Sectors</th><td>{% for s in obj.sectors.all %}{{s}}<br>{% endfor%}</td></tr>
 {% endif %}
-{% if type == "threat-actor" or type == "campaign" %}
+{% if type == "threat-actor" or type == "campaign" or type == "intrusion-set" %}
 <tr><th >Alias</th><td>{% for a in obj.aliases.all %}{{a}}<br>{% endfor%}</td></tr>
 {% endif %}
 {% if type == "sighting" %}
@@ -355,7 +352,7 @@ $(document).ready(
 <a href="/stix/{{w.object_id.object_id}}">{{w}}<br>{% endfor%}</td></tr>
 <tr><th >Sighting of</th><td><a href="/stix/{{obj.sighting_of_ref.object_id}}">{{obj.sighting_of_ref}}</a></td></tr>
 {% endif %}
-{% if type == "campaign" or type == "sighting" %}
+{% if type == "campaign" or type == "sighting" or type == "intrusion-set" %}
 <tr><th >First/Last Seen</th><td>{{obj.first_seen|date:"c"}} -<br>{{obj.last_seen|date:"c"}}</td></tr>
 {% endif %}
 {% endblock %}
@@ -383,7 +380,7 @@ STIX
 </div>
 <div id="stix_body" class="panel-collapse in">
 <div class="panel-body">
-<textarea id="stixtext" read-only style="height:500px;">{{stix}}</textarea>
+<textarea id="stixtext" read-only style="height:50vh;width:100%">{{stix}}</textarea>
 </div><!--/.panel_body-->
 </div><!--/#stix_body-->
 </div><!--/#stix_panel-->

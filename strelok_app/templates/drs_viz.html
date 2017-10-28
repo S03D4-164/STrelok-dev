@@ -1,13 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}
-<title>STIX</title>
-{% endblock %}
+{% block title %}<title>STIX</title>{% endblock %}
 
 {% block datetimepickerlib %}{% endblock %}
 {% block datatableslib %}{% endblock %}
 {% block tablesortlib %}{% endblock %}
-
 {% block jquery %}
 <script>
 function drawvis(){
@@ -21,7 +18,6 @@ function drawvis(){
                     result["nodes"],
                     result["edges"],
                     result["icon"],
-                    //{{types|safe}},
                 );
                 network.redraw();
             }
@@ -53,56 +49,27 @@ $(document).ready(
 {% endblock %}
 
 {% block container %}
-
 <div class="col-md-12">
 <div class="panel panel-default">
 <div class="panel-heading">STIX Defined Relationships</div>
 <div class="panel-body">
 
-<div class="col-md-7" style="margin: 0 auto;height:75vh" id="network" >
-</div>
-
+<div class="col-md-7" style="margin: 0 auto;height:75vh" id="network" ></div>
 <div class="col-md-5" >
 <h4>Double-click the node to jump to object list.</h4>
 <form method=post>{% csrf_token %}
-show icon:{{tsform.icon}}
+    <label>show icon:</label>{{tsform.icon}}
 <br><br>
 <div class="col-md-6" id="types_form">
-<input type="checkbox" id="select_types" checked>types</input>
-{{tsform.types}}
+    <input type="checkbox" id="select_types" checked><label>types</label>{{tsform.types}}
 </div>
 <div class="col-md-6" id="rel_form">
-<input type="checkbox" id="select_relation" checked>relationship</input>
-{{tsform.relation}}
+    <input type="checkbox" id="select_relation" checked><label>relationship</label>{{tsform.relation}}
 </div>
 </form>
 </div>
 
 </div><!--/panel-body-->
 </div><!--/panel-->
-</div>
-
-<!--
-<script type="text/javascript">
-var nodes = [
-{% for n in nodes %}{
-	'id':'{{n.id}}',
-	'label':'{{n.label}}',
-	'group':'{{n.group}}',
-	'title': '<table>{% for t in n.title %}<tr><td>{{t|escapejs}}</td></tr>{% endfor %}</table>',
-},
-{% endfor %}];
-
-var edges = [
-{% for e in edges %}{
-	'from':'{{e.from}}',
-	'to':'{{e.to}}',
-	'label':'{{e.label}}',
-	'title': '<table>{% for t in e.title %}<tr><td>{{t|escapejs}}</td></tr>{% endfor %}</table>',
-},
-{% endfor %}];
-var network = visNetwork(nodes, edges);
-</script>
--->
 </div>
 {% endblock%}

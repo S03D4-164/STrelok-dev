@@ -1,4 +1,5 @@
 from django.http import JsonResponse
+from django.utils.html import escape
 from django.shortcuts import redirect, render
 from django.db.models import Q
 
@@ -29,20 +30,14 @@ def timeline_view(request, id=None):
         else:
             obj = obj
     else:
-        if obj:
-            for o in  obj:
-                for r in get_related_obj(o, recursive=recursive):
-                    objs.append(r)
-        else:
-            obj = STIXObject.objects.all()
-            """
+        if not obj:
             obj = STIXObject.objects.filter(
                 object_type__name__in=[
                     "threat-actor"
                 ])
-            """
-            for o in  obj:
-                objs.append(get_obj_from_id(o.object_id))
+        for o in  obj:
+            for r in get_related_obj(o, recursive=recursive):
+                objs.append(r)
         obj = None
     from .stix import stix_bundle
     stix = stix_bundle(objs, mask=mask)
@@ -79,12 +74,12 @@ def find_attr(ref, stix):
 
 def set_group(so, data):
     # add object to subgroup and object_type to group
-    content = "<h4><a href=/stix/{0}>{1}</a></h4>".format(
-        so.id, so.name
+    content = "<h4><a href=/timeline/{0}>{1}</a></h4>".format(
+        so.id, escape(so.name)
     )
     if hasattr(so, "aliases"):
         for a in so.aliases:
-            content += "<li>{0}</li>".format(a)
+            content += "<li>{0}</li>".format(escape(a))
     sg = {
         "id": so.id,
         "content": content, 
@@ -155,8 +150,8 @@ def stix2timeline(stix):
                                 tgt = DotMap(tgt)
                                 item = {
                                     "id": sighting.id,
-                                    "content": "<a class='box' href=/stix/{0}>{1}</a>".format(
-                                        tgt.id,tgt.name
+                                    "content": "<a class='box' href=/timeline/{0}>{1}</a>".format(
+                                        tgt.id,escape(tgt.name)
                                     ),
                                     "group": so.id,
                                     #"group": None,
@@ -170,10 +165,14 @@ def stix2timeline(stix):
                                     item["group"] = a.id
                                 if sighting.last_seen:
                                     item["end"] = sighting.last_seen
+                                if tgt.labels:
+                                    label = escape(tgt.labels[0])
+                                    item["subgroup"] = label
+                                    #item["className"] = label
                                 if tgt.sectors:
-                                    item["subgroup"] = tgt.sectors[0]
-                                    item["className"] = tgt.sectors[0]
-                                #print(item)
+                                    sector = escape(tgt.sectors[0])
+                                    #item["subgroup"] = sector
+                                    item["className"] = sector
                                 data = set_item(item, data)
         elif obj["type"] == "report":
             report = DotMap(obj)
@@ -182,8 +181,8 @@ def stix2timeline(stix):
                 start= report.published
             item = {
                 "id": report.id,
-                "content": "<a class='box' href=/stix/{0}>{1}</a>".format(
-                    report.id,report.name
+                "content": "<a class='box' href=/timeline/{0}>{1}</a>".format(
+                    report.id,escape(report.name)
                 ),
                 "group": None,
                 "subgroup": report.type,
@@ -205,19 +204,21 @@ def stix2timeline(stix):
         elif obj["type"] == "campaign":
             campaign = DotMap(obj)
             if campaign.first_seen:
+                name = escape(campaign.name)
                 # if type is background, subgroup and className must be empty
                 item = {
                     "id": campaign.id,
-                    "content": "<a href=/stix/{0}>{1}</a>".format(
-                        campaign.id,campaign.name
+                    "content": "<a href=/timeline/{0}>{1}</a>".format(
+                        campaign.id,name
                     ),
                     #"group": None,
                     "group": campaign.id,
                     "subgroup": "",
-                    "className": "",
+                    "className": campaign.id,
+                    #"className": "",
                     "start": campaign.first_seen,
                     "end": campaign.first_seen,
-                    "title":"",
+                    "title":name,
                     "type":"background",
                 }
                 if campaign.last_seen:

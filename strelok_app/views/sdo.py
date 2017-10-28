@@ -42,7 +42,6 @@ def sdo_list(request, type):
             form = getform(type, request=request)
             if form.is_valid():
                 s = form.save()
-                #s = object_form_save(s, form)
                 messages.add_message(
                     request, messages.SUCCESS, 'Created -> '+str(s),
                 )
@@ -55,6 +54,10 @@ def sdo_list(request, type):
             input = None
             if bulkform.is_valid():
                 input = bulkform.cleaned_data["input"]
+            else:
+                messages.add_message(
+                    request, messages.ERROR, 'Creation Failed',
+                )
             if input:
                 if type == "attack-pattern":
                     kc = None
@@ -131,8 +134,9 @@ def sdo_list(request, type):
                                 t, cre = ThreatActor.objects.get_or_create(name=array[0])
                                 ta, cre = ThreatActorAlias.objects.get_or_create(name=array[0])
                                 t.aliases.add(ta)
-                                for l in label:
-                                    t.labels.add(l)
+                                if label:
+                                    for l in label:
+                                        t.labels.add(l)
                                 if len(array) >= 2:
                                     for a in array[1:]:
                                         if a:
@@ -157,8 +161,9 @@ def sdo_list(request, type):
                                 m, created = Malware.objects.get_or_create(
                                     name=array[0],
                                 )
-                                for l in label:
-                                    m.labels.add(l)
+                                if label:
+                                    for l in label:
+                                        m.labels.add(l)
                                 if len(array) >= 2:
                                     m.description = array[1]
                                 m.save()
@@ -174,40 +179,47 @@ def sdo_list(request, type):
                                 t, created = Tool.objects.get_or_create(
                                     name=array[0],
                                 )
-                                for l in label:
-                                    t.labels.add(l)
+                                if label:
+                                    for l in label:
+                                        t.labels.add(l)
                                 if len(array) >= 2:
                                     t.description = array[1]
                                 t.save()
+                elif type == "vulnerability":
+                    for line in input.split("\n"):
+                        if line:
+                            array = line.strip().split(",")
+                            if len(array) >= 1:
+                                v, cre = Vulnerability.objects.get_or_create(
+                                    name=array[0],
+                                )
+                                if len(array) >= 2:
+                                    v.description = array[1]
+                                v.save()
     c = {
         "type": type,
         "form": form,
         "bulkform": bulkform,
+        "bulkformat":"name,(description)",
     }
     if type == "report":
         c["bulkformat"] = "name,label,published,(description)"
     elif type == "attack-pattern":
-        c["bulkformat"] = "name,(description)"
         c["sform"] = KillChainForm()
     elif type == "campaign":
         c["bulkformat"] = "name,([alias,..])"
-    elif type == "course-of-action":
-        c["bulkformat"] = "name,(description)"
     elif type == "threat-actor":
         c["bulkformat"] = "name,([alias,..])"
         c["sform"] = ThreatActorLabelForm()
-        #c["data"] = stats_ati()
     elif type == "malware":
-        c["bulkformat"] = "name,(description)"
         c["sform"] = MalwareLabelForm()
     elif type == "tool":
-        c["bulkformat"] = "name,(description)"
         c["sform"] = ToolLabelForm()
     elif type == "identity":
         c["bulkformat"] = "name,(label,description)"
         c["sform"] = IdentityClassForm()
-        #c["data"] = cnt_tgt_by_label()
     elif type == "indicator":
+        c["bulkformat"] = ""
         c["sform"] = SelectObservableForm()
     return render(request, 'base_list.html', c)
 

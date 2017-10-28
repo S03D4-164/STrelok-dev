@@ -1,10 +1,8 @@
 {% extends "base.html" %}
-
-{% block title %}
-<title>STIX Parser</title>
-{% endblock %}
-
+{% block title %}<title>STIX Parser</title>{% endblock %}
 {% block datatableslib %}{% endblock %}
+{% block datetimepickerlib %}{% endblock %}
+{% block tablesortlib %}{% endblock %}
 {% block visjslib %}{% endblock %}
 {% block jquery %}
 <!--<link rel="stylesheet" type="text/css" href="/static/stixviz/app.css" /> -->
@@ -29,12 +27,7 @@ $(document).ready(
 );
 </script>
 {% endblock%}
-
 {% block container %}
-
-{% block modal %}{% endblock %}
-{% block modal_edit %}{% endblock %}
-
 {% block stixviz %}
 <div id="stix_parser" class="col-md-12">
 
@@ -56,62 +49,45 @@ $(document).ready(
 </div>
 
 </div><!--/#canvas-container-->
-
-</div>
-</div>
-</div><!--/#stixviz-->
+</div></div></div>
 {% endblock %}
 
 {% block table %}
 <div id="tables" class="col-md-12">
 <div class="panel panel-default">
-<div class="panel-heading">
-STIX Parser
-</div>
+<div class="panel-heading">STIX Parser</div>
 <div class="panel-body">
 <form method="post">{% csrf_token %}
 <!--<button type="button" id="viz" onclick=toggleViz("id_input") >Visualize</button>-->
 <div class="col-md-12">
 
-<div class="col-md-7">
-Parse:
+<div class="col-md-6"><label>Parse:</label>
 <input type="submit" name="parse_url" value="URLs">
 <input type="submit" name="parse_stix2" value="STIX2">
-<br>
-{{form}}
+<br>{{form.as_p}}
 </div>
 
-<div class="col-md-5">
-Filter:
+<div class="col-md-6">
+<label>Filter:</label>
 <div class="col-md-12">
-
 <div class="col-md-6" id="types_form">
-<input type="checkbox" id="select_types" checked>types</input>
-{{tform.types}}
+    <input type="checkbox" id="select_types" checked><label>types</label>{{tform.types}}
 </div>
-
 <div class="col-md-6" id="rel_form">
-<input type="checkbox" id="select_relation" checked>relationship</input>
-{{tform.relation}}
+    <input type="checkbox" id="select_relation" checked><label>relationship</label>{{tform.relation}}
 </div>
 
-</div>
-</div>
+</div></div>
 
 </div>
 
 <!--<input type="submit" name="import" value="Import">-->
 </form>
-</div><!--/.panel-body-->
-</div><!--/.panel-->
-</div><!--/tables-->
+</div></div></div>
 {% endblock %}
-
 {% block stixvizlib%}
 <script type="text/javascript" src="/static/d3/d3.min.js"></script>
 <script type="text/javascript" src="/static/stixviz/stix2viz.js"></script>
 <script type="text/javascript" src="/static/stixviz/app.js"></script>
 {% endblock %}
-
-
 {% endblock %}
