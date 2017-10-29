@@ -1,73 +1,60 @@
-{% extends "base_list.html" %}
+{% extends "base.html" %}
 
-{% block title %}
-<title>Attack Pattern</title>
-{% endblock %}
-
+{% block title %}<title>TTP Matrix</title>{% endblock %}
 {% block visjslib %}{% endblock %}
 {% block datatableslib %}{% endblock %}
-{% block datatimepickerlib %}{% endblock %}
-{% block jquery %}
-{% endblock%}
-
-
-{% block left_pane %}{% endblock %}
-{% block right_pane %}
-<div id="right_pane" class="col-md-12" >
+{% block datetimepickerlib %}{% endblock %}
+{% block jquery %}{% endblock%}
+{% block container %}
+<div class="col-md-12" >
 <div class="panel panel-default">
-
-<div class="panel-heading">
-TTP Matrix
-</div>
+<div class="panel-heading">TTP Matrix</div>
 <div class="panel-body">
 
-<div class="col-md-9">
+<button style="float:right;" data-toggle="collapse" data-target="#option">Option</button>
+<div id="option" class="collapse">
+<div>
+<form style="float:right" class="create_form" method=post>{% csrf_token %}
+{{form}}<input type=submit name="refresh" value="refresh">
+</form>
+</div>
+<div >
+<h4>Kill Chain Phase:</h4>
+{% for pn,cc in color.items %}
+{{pn}}:<span style="font-size:200%;color:#{{cc}}">■ </span>
+{% endfor %}
+</div>
+</div>
+
+<div class="col-md-12">
 <table id="ttp_table" class="table table-borderd">
-<thead><tr>
-<th colspan="2">Kill Chain Phase</th>
+<thead><tr><th colspan="1">TTP</th>
 {% for a in actor %}<th><a href="/stix/{{a.object_id.object_id}}">{{a}}</th>{% endfor%}
 </tr></thead>
 <tbody>
-{% for c in killchain %}<tr>
-{% for k,v in kdict.items %}{% if k == c.phase_name %}
-<th rowspan="{% if not v %}1{% else %}{{v}}{% endif %}">{{c.phase_name|capfirst}}</th>
-{% endif %}{% endfor %}
 {% for pn,d in data.items %}
-{% if pn == c.phase_name %}
-{% if not d%}
-<td></td>{% for a in actor%}<td></td>{% endfor %}
-{% else %}
+{% if d %}
 {% for k, v in d.items %}
-<td class="{{k.object_type.name}}"><a href="/stix/{{k.object_id.object_id}}">{{k}}</a></td>
-{% for a in actor%}
-<td style="background-color:
+<tr><td class="{{k.object_type.name}}"><a href="/stix/{{k.object_id.object_id}}">{{k}}</a></td>
+{% for a in actor %}
+<td
 {% for i in v %}
-{% if a.id == i %}lightblue;{% endif %}
+{% if a.id == i %}
+{% for cn, cc in color.items %}
+{% if cn == pn %}
+style="background-color:#{{cc}};"><a href="/stix/">{{k}}</a
+{% endif %}
 {% endfor %}
-">
-</td>
+{% endif %}
+{% endfor %}
+></td>
 {% endfor %}
 </tr>
 {% endfor %}
 {% endif %}
-{% endif %}
-{% endfor %}
 {% endfor %}
 </tbody>
 </table>
+</div></div></div>
 </div>
-
-<div class="col-md-3">
-<form class="create_form" method=post>{% csrf_token %}
-<table class="table table_condensed">
-{{form.as_table}}
-</table>
-<input type=submit name="refresh" value="refresh">
-</form>
-</div>
-
-</div>
-</div><!--/.panel-body-->
-</div><!--/.panel-->
-</div><!--/.col-md-6-->
 {% endblock %}

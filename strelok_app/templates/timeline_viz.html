@@ -13,6 +13,22 @@
     }
     {% endfor%}
 </style>
+<script>
+function toggleOption(){
+    console.log(this);
+    var x = document.getElementById("option");
+    var y = document.getElementById("visualization");
+    if (x.style.display === "none") {
+        x.style.display = "block";
+        x.style.width = "30%";
+        y.style.width = "70%";
+    } else {
+        x.style.display = "none";
+        x.style.width = "0%";
+        y.style.width = "100%";
+    }
+};
+</script>
 {% endblock %}
 
 {% block container %}
@@ -24,20 +40,19 @@
 <input class="btn" type="button" id="zoomOut" value="Zoom out"/>
 <input class="btn" type="button" id="moveLeft" value="Move left"/>
 <input class="btn" type="button" id="moveRight" value="Move right"/>
+<button style="float:right;" class="btn btn-md" onclick=toggleOption()>▼ Legend</button>
 
-<div class="col-md-9" id="visualization" >
-</div>
+<div style="float:left;width:100%" id="visualization" ></div>
 
-<div class="col-md-3">
-<button class="btn" data-toggle="collapse" href="#types_form">▼ Option</button>
-<form method=post>{% csrf_token %}
+<div id="option" style="display:none;width:0%;float:right;">
+<button class="btn btn-block" data-toggle="collapse" href="#types_form">Option</button>
 <div id="types_form" class="collapse">
-{{form.as_p}}
+<form method=post>{% csrf_token %}
+<table class="table table-condensed">{{form}}</table>
 <input type=submit name="refresh" value="refresh">
-</div>
 </form>
 <hr>
-<h4>Legend</h4>
+</div>
 {% for k,v in colors.items %}
 <input class="legend" id="{{k}}" type="checkbox" value="{{k}}" checked>
 <span style="font-size:200%;color:{{v}}">■</span>: {{k}}<br>
@@ -123,9 +138,11 @@ document.getElementById('id_stack_groups').onchange = function () {
 document.getElementById('id_stack_subgroups').onchange = function () {
     timeline.setOptions({stackSubgroups:$(this).prop("checked")});
 };
+/*
 document.getElementById('id_show_minor_labels').onchange = function () {
     timeline.setOptions({showMinorLabels:$(this).prop("checked")});
 };
+*/
 
 $('input.legend').click(function() {
 checked = $(this).prop("checked");

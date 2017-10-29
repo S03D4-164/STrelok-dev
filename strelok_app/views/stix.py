@@ -301,6 +301,9 @@ def stix_bundle(objs, mask=True):
     objects = ()
     for obj in objs:
         oid = obj.object_id.object_id
+        dscr = ""
+        if not mask and hasattr(obj, "description"):
+            dscr = obj.description
         if obj.object_type.name == 'attack-pattern':
             dscr = obj.description
             if mask:
@@ -345,17 +348,17 @@ def stix_bundle(objs, mask=True):
             name = obj.name
             dscr=obj.description
             if mask:
-                name = id
+                name = oid
                 label = obj.labels.all()
                 if label.count() >=1:
                     name = label[0].value + '-' + str(obj.id)
                 dscr=""
             i = stix2.Identity(
                 #id=obj.object_id.object_id,
-                id=id,
+                id=oid,
                 name=name,
                 identity_class=obj.identity_class,
-                description=description,
+                description=dscr,
                 sectors=[str(s.value) for s in obj.sectors.all()],
                 labels=[str(l.value) for l in obj.labels.all()],
                 created=obj.created,

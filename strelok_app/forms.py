@@ -340,7 +340,7 @@ class TimelineForm(forms.Form):
                 "report",
             ]
         ),initial=STIXObjectType.objects.filter(name="threat-actor"),
-        widget=forms.CheckboxSelectMultiple()
+        #widget=forms.CheckboxSelectMultiple()
     )
     def __init__(self, *args, **kwargs):
         super(TimelineForm, self).__init__(*args, **kwargs)

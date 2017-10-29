@@ -90,3 +90,7 @@ table#ttp_table td.tool{
 table#ttp_table td a {
     color:white;
 }
+
+form label{
+    vertical-align:top;
+}

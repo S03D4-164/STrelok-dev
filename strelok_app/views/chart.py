@@ -9,24 +9,17 @@ import json, hashlib
 
 def actor_chart(request, cnt_by='sector'):
     sights = Sighting.objects.all()
-    #tgt = Identity.objects.all()
-    tgt = Identity.objects.filter(object_id__in=sights.values("where_sighted_refs"))
+    tgt = Identity.objects.all()
+    #tgt = Identity.objects.filter(object_id__in=sights.values("where_sighted_refs"))
     rels = Relationship.objects.all()
-    data = cnt_actor_from_tgt(tgt, rels, sights)
+    data = cnt_actor_from_tgt(tgt, rels, sights, drilldown=True)
+    #print(data)
     dataset = []
     for d in data:
-        target = None
-        if d["name"] == "Unknown":
-            target = tgt.filter(id__in=d["id"])
-        dd = cnt_tgt_by_prop(
-            cnt_by=cnt_by,
-            actor_name=d["name"],
-            tgt=target,
-            drilldown=False,
-        )
+        dd = cnt_tgt_by_prop(tgt=d["tgt"], cnt_by=cnt_by, drilldown=False)
         drilldown = {
-            "name": "Targets of " + d["name"],
-            "data": json.loads(dd),
+            "name": "Target categories of " + d["name"],
+            "data": dd,
         }
         da = {
             "name":d["name"],
@@ -37,12 +30,11 @@ def actor_chart(request, cnt_by='sector'):
     dataset = json.dumps(dataset,indent=2)
     return HttpResponse(dataset,  content_type="application/json")
 
-def cnt_actor_from_tgt(tgt, rels, sights):
+def cnt_actor_from_tgt(tgt, rels, sights, drilldown=False):
     data = {}
-    for a in ThreatActor.objects.all():
-        data[a.name] = 0
+    for ta in ThreatActor.objects.all():
+        data[ta.name] = []
     unidentified = []
-    unknown = len(tgt)
     for t in tgt:
         l = []
         s = sights.filter(
@@ -61,38 +53,40 @@ def cnt_actor_from_tgt(tgt, rels, sights):
             )
             l += at.values_list("target_ref",flat=True)
             ta = ThreatActor.objects.filter(object_id__in=list(set(l)))
+            #print(t,ta)
             if ta:
                 for a in ta:
-                    data[a.name] += 1
+                    data[a.name].append(t)
             else:
-                unidentified.append(t.id)
-        else:
-            unknown -= 1
+                unidentified.append(t)
     dd = []
     for k, v in data.items():
         if v:
             ai = {
                 "name": k,
-                "y": v,
+                "y": len(v),
             }
+            if drilldown:
+                ai["tgt"] = v
             dd.append(ai)
-            unknown -= v
     dd = sorted(
         dd,
         key=lambda kv: kv["y"],
         reverse=True
     )
-    if unknown:
-        dd.append({
+    if unidentified:
+        ai = {
             "name":"Unknown",
-            "y":unknown,
-            "id":unidentified,
-        })
+            "y":len(unidentified),
+        }
+        if drilldown:
+            ai["tgt"] = unidentified
+        dd.append(ai)
     return dd
 
 def target_chart(request, cnt_by="sector"):
     data = cnt_tgt_by_prop(cnt_by=cnt_by)
-    return HttpResponse(data,  content_type="application/json")
+    return HttpResponse(json.dumps(data, indent=2),  content_type="application/json")
 
 def cnt_tgt_by_prop(cnt_by="sector", actor_name=None, drilldown=True, tgt=None):
     dataset = []
@@ -121,39 +115,50 @@ def cnt_tgt_by_prop(cnt_by="sector", actor_name=None, drilldown=True, tgt=None):
             Q(object_id__in=sights.values_list("where_sighted_refs",flat=True))|\
             Q(object_id__in=rels.values_list("target_ref",flat=True)),
         )
-    if cnt_by == "sector":
-        prop = IndustrySector.objects.all()
-    elif cnt_by == "label":
-        prop = IdentityLabel.objects.all()
-    for p in prop:
-        tgt_filtered = []
-        if cnt_by == "sector":
-            tgt_filtered = tgt.filter(sectors=p)
-        elif cnt_by == "label":
-            tgt_filtered = tgt.filter(labels=p)
-        if tgt_filtered:
-            cnt = tgt_filtered.count()
-            if cnt:
-                item = {
-                    "name": p.value,
-                    "y": cnt,
-                    #"drilldown":{"data": []},
-                }
-                if drilldown:
-                    item["drilldown"] = {"data": []}
-                    dd = cnt_actor_from_tgt(tgt_filtered, rels, sights)
-                    item["drilldown"] = {
-                        "name": "Threat actor targets " + p.value,
-                        "data": dd,
-                    }
-                if not item in dataset:
-                    dataset.append(item)
+    prop = {}
+    noprop = {"name":"N/A", "y":[]}
+    if tgt:
+        for t in tgt:
+            category = None
+            if cnt_by == "sector":
+                category = t.sectors.all()
+            elif cnt_by == "label":
+                category = t.labels.all()
+            if category:
+                for c in category:
+                    if not c.value in prop:
+                        prop[c.value] = [t]
+                    else:
+                        prop[c.value].append(t)
+            else:
+                noprop["y"].append(t)
+    for k,v in prop.items():
+        item = {"name":k,"y":len(v)}
+        if drilldown:
+            item["drilldown"] = {"data": []}
+            dd = cnt_actor_from_tgt(v, rels, sights, drilldown=False)
+            item["drilldown"] = {
+                "name": "Threat actor targets " + k,
+                "data": dd,
+            }
+        if not item in dataset:
+            dataset.append(item)
     dataset = sorted(
             dataset,
             key=lambda kv: kv["y"],
             reverse=True
     )
-    dataset = json.dumps(dataset,indent=2)
+    if len(noprop["y"]) > 0:
+        if drilldown:
+            dd = cnt_actor_from_tgt(noprop["y"], rels, sights, drilldown=False)
+            noprop["drilldown"] = {
+                "name": "Threat actor targets " + noprop["name"],
+                "data": dd,
+            }
+        noprop["y"] = len(noprop["y"])
+        dataset.append(noprop)
+    #print(dataset)
+    #dataset = json.dumps(dataset,indent=2)
     return dataset
 
 def kill_chain_view(request):
@@ -206,8 +211,6 @@ def kill_chain_view(request):
                 if not p in data:
                     data.append(p)
                 #print(rels)
-                #tas = ThreatActor.objects.all()
-                #for s in rels.values_list("source_ref", flat=True):
                 for ta in tas:
                     rels = Relationship.objects.filter(
                         #source_ref__object_id__startswith="threat-actor",
@@ -240,7 +243,7 @@ def ttp_view(request):
     actor = []
     sot = [
         "attack-pattern",
-        "indicator",
+        #"indicator",
         "malware",
         "tool",
     ]
@@ -258,10 +261,12 @@ def ttp_view(request):
         object_type__in=type
     )
     #a = ThreatActor.objects.all().values_list("object_id", flat=True)
-    killchain = KillChainPhase.objects.all().order_by("id")
+    killchain = KillChainPhase.objects.all()
     data = {}
+    color = {}
     for k in killchain:
         data[k.phase_name] = {}
+        color[k.phase_name] = hashlib.md5(k.phase_name.encode("utf8")).hexdigest()[0:6]
     for obj in objs:
         o = get_obj_from_id(obj.object_id)
         if o.kill_chain_phases:
@@ -281,14 +286,15 @@ def ttp_view(request):
                 if rel:
                     #data[kcp.phase_name][o.name] = rel
                     data[kcp.phase_name][o] = rel
-    kdict = {}
-    for k,v in data.items():
-        kdict[k] = len(v)
+    #kdict = {}
+    #for k,v in data.items():
+    #    kdict[k] = len(v)
     c = {
         "killchain": killchain,
-        "kdict": kdict,
+        #"kdict": kdict,
         "actor": actor,
         "data":data,
+        "color":color,
         "form":form,
     }
     return render(request, 'ttp_view.html', c)
