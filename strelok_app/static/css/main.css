@@ -1,5 +1,4 @@
 body{
-    //width:1280px;
     width:100%;
     margin: 0 auto;
 }
@@ -21,6 +20,7 @@ table{
 textarea {
     width:100%;
 }
+
 textarea#id_description{
     height:100px;
 }
@@ -59,38 +59,15 @@ form.add_form select[multiple]{
     height:200px;
 }
 
-
 div#network {
-    //height: 400px;
     border: 1px solid lightgray;
 }
-
 
 a.box{
     color:white;
 }
 
-table#ttp_table th {
-    text-align:center;
-    vertical-align:middle;
-}
-
-table#ttp_table td.malware {
-    background-color:red;
-}
-
-table#ttp_table td.attack-pattern{
-    background-color:darkorange;
-}
-
-table#ttp_table td.tool{
-    background-color:goldenrod;
-}
-
-table#ttp_table td a {
-    color:white;
-}
-
-form label{
+label{
     vertical-align:top;
+    margin-left:10px;
 }

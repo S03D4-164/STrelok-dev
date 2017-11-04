@@ -329,7 +329,7 @@ class SightingData(BaseDatatableView):
                 o = get_obj_from_id(r.object_id)
                 if o:
                     o = escape(str(o))
-                wsr += "<a href=/stix/{0}>{1}</href><br>".format(r.object_id, o)
+                wsr += "<a href=/stix/{0}>{1}</href><br>".format(r.object_id.object_id, o)
             return wsr
         elif column == 'object_id':
             return "<a href=/stix/{0}>{1}</href>".format(row.object_id.object_id, row.object_id.object_id)

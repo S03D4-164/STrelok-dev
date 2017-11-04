@@ -7,21 +7,21 @@
 {% block jquery %}
 <link rel="stylesheet" type="text/css" href="/static/css/timeline.css">
 <style>
-    {% for k,v in colors.items %}
-    .vis-item.{{k}} {
+{% for k,v in colors.items %}
+.vis-item.{{k}} {
     background-color: {{v}};
-    }
-    {% endfor%}
+}
+{% endfor%}
 </style>
 <script>
 function toggleOption(){
-    console.log(this);
+    //console.log(this);
     var x = document.getElementById("option");
     var y = document.getElementById("visualization");
     if (x.style.display === "none") {
         x.style.display = "block";
-        x.style.width = "30%";
-        y.style.width = "70%";
+        x.style.width = "20%";
+        y.style.width = "80%";
     } else {
         x.style.display = "none";
         x.style.width = "0%";
@@ -36,11 +36,12 @@ function toggleOption(){
 <div class="panel panel-default">
 <div class="panel-heading">Timeline{% if obj %} of <a href="/stix/{{id}}">{{obj}}</a>{% endif %}</div>
 <div class="panel-body">
-<input class="btn"  type="button" id="zoomIn" value="Zoom in"/>
-<input class="btn" type="button" id="zoomOut" value="Zoom out"/>
-<input class="btn" type="button" id="moveLeft" value="Move left"/>
-<input class="btn" type="button" id="moveRight" value="Move right"/>
-<button style="float:right;" class="btn btn-md" onclick=toggleOption()>▼ Legend</button>
+<input class="btn btn-sm"  type="button" id="zoomIn" value="Zoom in"/>
+<input class="btn btn-sm" type="button" id="zoomOut" value="Zoom out"/>
+<input class="btn btn-sm" type="button" id="moveLeft" value="Move left"/>
+<input class="btn btn-sm" type="button" id="moveRight" value="Move right"/>
+<button style="float:right;margin-left:10px;" class="btn btn-sm" onclick=toggleOption()>▼ Legend</button>
+<form style="float:right">{{vform}}</form>
 
 <div style="float:left;width:100%" id="visualization" ></div>
 
@@ -48,14 +49,16 @@ function toggleOption(){
 <button class="btn btn-block" data-toggle="collapse" href="#types_form">Option</button>
 <div id="types_form" class="collapse">
 <form method=post>{% csrf_token %}
-<table class="table table-condensed">{{form}}</table>
+{{form.as_p}}
 <input type=submit name="refresh" value="refresh">
 </form>
 <hr>
 </div>
 {% for k,v in colors.items %}
+{% if k != "report" %}
 <input class="legend" id="{{k}}" type="checkbox" value="{{k}}" checked>
 <span style="font-size:200%;color:{{v}}">■</span>: {{k}}<br>
+{% endif %}
 {% endfor %}
 </div>
 
@@ -95,9 +98,9 @@ items.add([{% for k,i in items.items %}
     start: "{{i.start}}",
     {% if i.subgroup %}subgroup: "{{i.subgroup}}",{% endif %}
     {% if i.className %}className: "{{i.className}}",{% endif %}
-    {% if i.end %}end: "{{i.end}}",
+    {% if i.end %}end: "{{i.end}}",{% endif %}
     {% if i.type %}type: "{{i.type}}",{% endif %}
-    {% endif %}
+    {% if i.subgroup == "report" %}style: "visibility:hidden",{% endif %}
 },
 {% endif %}
 {% endfor %}]);
@@ -109,6 +112,8 @@ var options = {
     type: 'point',
     stack: true,
     stackSubgroups: true,
+    groupOrder: 'content',
+    //subgroupOrder: 'content',
 };
 {% if groups %}
 var timeline = new vis.Timeline(container, items, groups, options);
@@ -147,7 +152,10 @@ document.getElementById('id_show_minor_labels').onchange = function () {
 $('input.legend').click(function() {
 checked = $(this).prop("checked");
 var c = $(this).attr("id");
-var item = items.get()
+toggleItem(c, checked);
+});
+function toggleItem(c, checked) {
+var item = items.get();
 for (var i in item){
     j = item[i]["id"];
     k = items.get(j);
@@ -159,7 +167,7 @@ for (var i in item){
         };
     };
 };
-});
+};
 $('#id_group input').click(function() {
 checked = $(this).prop("checked");
 var t = $(this).parent().text().replace(/^\s+/, "");
@@ -170,6 +178,15 @@ for (var i in g["nestedGroups"]){
 }
 groups.update({id:g["id"], visible:checked});
 });
+document.getElementById('id_report').onchange = function () {
+checked = $(this).prop("checked");
+toggleItem("report", checked);
+if (checked==true){
+    $("div.report").show();
+}else{
+    $("div.report").hide();
+};
+};
 </script>
 </div>
 {% endblock%}

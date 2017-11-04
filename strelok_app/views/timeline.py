@@ -44,6 +44,7 @@ def timeline_view(request, id=None):
     data = stix2timeline(json.loads(str(stix)))
     c = {
         "form": form,
+        "vform": VisForm(),
         "id":id,
         "obj":obj,
         "items": data["items"],

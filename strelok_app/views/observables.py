@@ -62,17 +62,18 @@ def obs_view(request, id):
             #form = getform(o.type.name,instance=o, request=request)
             form = getobsform(o.type.name,instance=o, request=request)
             if form.is_valid():
-                s = form.save()
+                if o.type.name in ["file"]:
+                    o.name = form.cleaned_data["value"]
+                    o.save()
+                else:
+                    s = form.save()
                 if o.type.name in ["domain-name"]:
                     new = form.cleaned_data["new_refs"]
                     for line in new.split("\n"):
                         if line:
-                            #o, p = create_obs_from_line(line)
-                            o = create_obs_from_line(line)
-                            s.resolve_to_refs.add(o)
-                            #if not p in pattern:
-                            #    pattern.append(p)
-                s.save()
+                            r = create_obs_from_line(line)
+                            o.resolve_to_refs.add(r)
+                    o.save()
                 
     objects = []
     rels = []
@@ -201,7 +202,6 @@ def obs2pattern(observable, new=None, indicator=None, generate=False):
             p.save()
     return p
 
-#def getform(type, request=None, instance=None, report=None):
 def getobsform(type, request=None, instance=None, report=None):
     post = None
     if request:
@@ -211,65 +211,6 @@ def getobsform(type, request=None, instance=None, report=None):
         return DomainNameForm(post,instance=instance)
     else:
         return DomainNameForm(post,instance=instance)
-    """
-    elif type == "attack-pattern":
-        return AttackPatternForm(post,instance=instance)
-    elif type == "campaign":
-        return CampaignForm(post,instance=instance)
-    elif type == "course-of-action":
-        return CourseOfActionForm(post,instance=instance)
-    elif type == "identity":
-        return IdentityForm(post,instance=instance)
-    elif type == "intrusion-set":
-        return IntrusionSetForm(post,instance=instance)
-    elif type == "malware":
-        return MalwareForm(post,instance=instance)
-    elif type == "observed-data":
-        return ObservedDataForm(post,instance=instance)
-    elif type == "report":
-        return ReportForm(post,instance=instance)
-    elif type == "threat-actor":
-        return ThreatActorForm(post,instance=instance)
-    elif type == "tool":
-        return ToolForm(post,instance=instance)
-    elif type == "vulnerability":
-        return VulnerabilityForm(post,instance=instance)
-    elif type == "indicator":
-        return IndicatorForm(post,instance=instance)
-    elif type == "relationship":
-        form = RelationshipForm(post,instance=instance)
-        if report:
-            # exclude SRO
-            choices = object_choices(
-                ids=report.object_refs.all().exclude(
-                Q(object_id__startswith="relationship--")|\
-                Q(object_id__startswith="sighting--")|\
-                Q(object_id__startswith="observed-data--")|\
-                Q(object_id__startswith="report--")
-                )
-            )
-            form.fields["source_ref"].choices = choices
-            form.fields["target_ref"].choices = choices
-        return form
-    elif type == "sighting":
-        form = SightingForm(post,instance=instance)
-        if report:
-            wsr = object_choices(
-                ids=report.object_refs.filter(
-                    object_id__startswith="identity"
-                )
-            )
-            form.fields["where_sighted_refs"].choices = wsr
-            sor = myforms.object_choices(
-                ids=report.object_refs.all().exclude(
-                    object_id__startswith="relationship"
-                ).exclude(
-                    object_id__startswith="sighting"
-                )
-            )
-            form.fields["sighting_of_ref"].choices = sor
-        return form
-    """
     return None
 
 def _get_model_from_type(type):

@@ -228,7 +228,7 @@ class CourseOfAction(STIXObject):
 
 class IdentityLabel(models.Model):
     value = models.CharField(max_length=250, unique=True)
-    #category = models.CharField(max_length=250, blank=True, null=True)
+    alias = models.CharField(max_length=250, blank=True, null=True)
     def __str__(self):
         return self.value
     class Meta:

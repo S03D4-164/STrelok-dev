@@ -13,9 +13,11 @@ def stix2_json_masked(request):
     res = stix2_json(request, mask=True)
     return res
 
-def stix2_json(request, id=None, mask=True):
-    if request.user.is_authenticated():
+def stix2_json(request, id=None, mask=None):
+    if not mask and request.user.is_authenticated():
         mask = False
+    else:
+        mask = True
     objs = []
     if not id:
         for i in STIXObjectID.objects.all():
@@ -233,6 +235,8 @@ def stix2_db(obj):
             m.save()
             return m
         elif type == 'observed-data':
+            if not "objects" in obj:
+                return None
             o = model.objects.create(
                 first_observed=obj["first_observed"],
                 last_observed=obj["last_observed"],
@@ -305,9 +309,9 @@ def stix_bundle(objs, mask=True):
         if not mask and hasattr(obj, "description"):
             dscr = obj.description
         if obj.object_type.name == 'attack-pattern':
-            dscr = obj.description
-            if mask:
-                dscr = ""
+            #dscr = obj.description
+            #if mask:
+            #    dscr = ""
             a = stix2.AttackPattern(
                 id=oid,
                 name=obj.name,
@@ -318,9 +322,9 @@ def stix_bundle(objs, mask=True):
             )
             objects += (a,)
         elif obj.object_type.name == 'campaign':
-            dscr = obj.description
-            if mask:
-                dscr = ""
+            #dscr = obj.description
+            #if mask:
+            #    dscr = ""
             c = stix2.Campaign(
                 id=oid,
                 name=obj.name,
@@ -333,9 +337,9 @@ def stix_bundle(objs, mask=True):
             )
             objects += (c,)
         elif obj.object_type.name == 'course-of-action':
-            dscr = obj.description
-            if mask:
-                dscr = ""
+            #dscr = obj.description
+            #if mask:
+            #    dscr = ""
             c = stix2.CourseOfAction(
                 id=oid,
                 name=obj.name,
@@ -346,13 +350,13 @@ def stix_bundle(objs, mask=True):
             objects += (c,)
         elif obj.object_type.name == 'identity':
             name = obj.name
-            dscr=obj.description
+            #dscr=obj.description
             if mask:
                 name = oid
                 label = obj.labels.all()
                 if label.count() >=1:
-                    name = label[0].value + '-' + str(obj.id)
-                dscr=""
+                    name = str(obj.id) + '-' + label[0].value
+                #dscr=""
             i = stix2.Identity(
                 #id=obj.object_id.object_id,
                 id=oid,
@@ -372,7 +376,7 @@ def stix_bundle(objs, mask=True):
             i = stix2.Indicator(
                 id=oid,
                 name=obj.name,
-                description=obj.description,
+                description=dscr,
                 labels=[str(l.value) for l in obj.labels.all()],
                 pattern= pattern,
                 created=obj.created,
@@ -382,9 +386,9 @@ def stix_bundle(objs, mask=True):
             )
             objects += (i,)
         elif obj.object_type.name == 'intrusion-set':
-            dscr = obj.description
-            if mask:
-                dscr = ""
+            #dscr = obj.description
+            #if mask:
+            #    dscr = ""
             i = stix2.IntrusionSet(
                 id=oid,
                 name=obj.name,
@@ -397,9 +401,9 @@ def stix_bundle(objs, mask=True):
             )
             objects += (i,)
         elif obj.object_type.name == 'malware':
-            dscr = obj.description
-            if mask:
-                dscr = ""
+            #dscr = obj.description
+            #if mask:
+            #    dscr = ""
             m = stix2.Malware(
                 id=oid,
                 name=obj.name,
@@ -443,9 +447,9 @@ def stix_bundle(objs, mask=True):
             created_by = None
             if obj.created_by_ref:
                 created_by=obj.created_by_ref.object_id
-            dscr = obj.description
-            if mask:
-                dscr = ""
+            #dscr = obj.description
+            #if mask:
+            #    dscr = ""
             r = stix2.Report(
                 id=oid,
                 labels=[str(l.value) for l in obj.labels.all()],
@@ -459,9 +463,9 @@ def stix_bundle(objs, mask=True):
             )
             objects += (r,)
         elif obj.object_type.name == 'threat-actor':
-            dscr = obj.description
-            if mask:
-                dscr = ""
+            #dscr = obj.description
+            #if mask:
+            #    dscr = ""
             t = stix2.ThreatActor(
                 id=oid,
                 name=obj.name,
@@ -473,9 +477,9 @@ def stix_bundle(objs, mask=True):
             )
             objects += (t,)
         elif obj.object_type.name == 'tool':
-            dscr = obj.description
-            if mask:
-                dscr = ""
+            #dscr = obj.description
+            #if mask:
+            #    dscr = ""
             t = stix2.Tool(
                 id=oid,
                 name=obj.name,
@@ -487,9 +491,9 @@ def stix_bundle(objs, mask=True):
             )
             objects += (t,)
         elif obj.object_type.name == 'vulnerability':
-            dscr = obj.description
-            if mask:
-                dscr = ""
+            #dscr = obj.description
+            #if mask:
+            #    dscr = ""
             v = stix2.Vulnerability(
                 id=oid,
                 name=obj.name,
@@ -499,9 +503,9 @@ def stix_bundle(objs, mask=True):
             )
             objects += (v,)
         elif obj.object_type.name == 'relationship':
-            dscr = obj.description
-            if mask:
-                dscr = ""
+            #dscr = obj.description
+            #if mask:
+            #    dscr = ""
             r = stix2.Relationship(
                 id=oid,
                 relationship_type=obj.relationship_type.name,
@@ -534,7 +538,7 @@ def stix_view(request):
         #print(request.POST)
         if 'import' in request.POST:
             form = InputForm(request.POST)
-            if form.is_valid():
+            if request.user.is_authenticated() and form.is_valid():
                 stix = json.loads(form.cleaned_data["input"])
                 if "objects" in stix:
                     sdos = {}
@@ -557,18 +561,27 @@ def stix_view(request):
                         if res:
                             sdos[i] = res
                     for i in sights:
-                        sight2db(sights[i], sdos)
+                        res = sight2db(sights[i], sdos)
                         if res:
                             sdos[i] = res
                     for i in reps:
-                        rep2db(reps[i], sdos)
-            messages.add_message(
-                request,
-                messages.SUCCESS,
-                'Import Completed'
-            )
+                        res = rep2db(reps[i], sdos)
+                        if res:
+                            sdos[i] = res
+                messages.add_message(
+                    request,
+                    messages.SUCCESS,
+                    'Import Completed ' + sdos
+                )
+            else:
+                messages.add_message(
+                    request,
+                    messages.ERROR,
+                    'Import Failed'
+                )
         elif 'export' in request.POST:
             objs = []
+            """
             for i in STIXObjectID.objects.all():
                 o = get_obj_from_id(i)
                 if o:
@@ -576,6 +589,7 @@ def stix_view(request):
             bundle = stix_bundle(objs, mask=False)
             j = json.dumps(json.loads(str(bundle)), indent=2)
             return HttpResponse(j,  content_type="application/json")
+            """
         elif 'timeline' in request.POST:
             form = InputForm(request.POST)
             if form.is_valid():
@@ -589,7 +603,6 @@ def stix_view(request):
                     "form":TimelineForm(),
                 }
                 return render(request, 'timeline_viz.html', c)
-
         elif 'parse_stix2' in request.POST or 'parse_url' in request.POST:
             form = InputForm(request.POST)
             tform = TypeSelectForm(request.POST)

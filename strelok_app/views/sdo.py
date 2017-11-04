@@ -40,7 +40,7 @@ def sdo_list(request, type):
     if request.method == "POST":
         if "create" in request.POST:
             form = getform(type, request=request)
-            if form.is_valid():
+            if request.user.is_authenticated() and form.is_valid():
                 s = form.save()
                 messages.add_message(
                     request, messages.SUCCESS, 'Created -> '+str(s),
@@ -52,7 +52,7 @@ def sdo_list(request, type):
         elif "create_bulk" in request.POST:
             bulkform = InputForm(request.POST)
             input = None
-            if bulkform.is_valid():
+            if request.user.is_authenticated() and bulkform.is_valid():
                 input = bulkform.cleaned_data["input"]
             else:
                 messages.add_message(
@@ -312,7 +312,11 @@ def get_model_from_type(type):
     m = getattr(mymodels, name)
     return m
 
-def sdo_view(request, id):
+def sdo_view_recursive(request, id):
+    res = sdo_view(request, id, recursive=True)
+    return res
+
+def sdo_view(request, id, recursive=False):
     mask = True
     sdo = STIXObject.objects.get(object_id__object_id=id)    
     m = get_model_from_type(id)
@@ -323,7 +327,7 @@ def sdo_view(request, id):
         if not m == Identity:    
             sdo = m.objects.get(object_id__object_id=id)
     form = getform(id.split("--")[0], instance=sdo)
-    objs = get_related_obj(sdo)
+    objs = get_related_obj(sdo, recursive=recursive)
 
     objects = []
     rels = []
@@ -352,9 +356,10 @@ def sdo_view(request, id):
         elif o.object_type.name == "sighting":
             sights.append(o)
         elif o.object_type.name == "observed-data":
-            objects.append(o)
-            for ob in o.observable_objects.all():
-                observables.append(ob)
+            observables.append(o)
+            #objects.append(o)
+            #for ob in o.observable_objects.all():
+            #    observables.append(ob)
         else:
             objects.append(o)
 
@@ -391,18 +396,19 @@ def sdo_view(request, id):
         print(request.POST)
         if 'update' in request.POST:
             form = getform(id.split("--")[0],request=request,instance=sdo)
-            if form.is_valid():
+            if request.user.is_authenticated() and form.is_valid():
                 s = form.save()
                 messages.add_message(request, messages.SUCCESS, 'Updated.')
                 return redirect("/stix/"+id)
         elif 'delete' in request.POST:
             name = str(sdo)
-            sdo.delete()
-            messages.add_message(
-                request, messages.SUCCESS,
-                'Deleted -> ' + name
-            )
-            return redirect("/stix/"+id.split("--")[0])
+            if request.user.is_authenticated():
+                sdo.delete()
+                messages.add_message(
+                    request, messages.SUCCESS,
+                    'Deleted -> ' + name
+                )
+                return redirect("/stix/"+id.split("--")[0])
         elif 'detach[]' in request.POST:
             dlist = request.POST.getlist("detach[]")
             if sdo.object_type.name == "report":
@@ -415,16 +421,20 @@ def sdo_view(request, id):
                 rms = Sighting.objects.filter(
                     object_id__in=sdo.object_refs.all()
                 ).filter(
-                    Q(sighting_of_ref__in=rm)|Q(where_sighted_refs__in=rm)
+                    Q(sighting_of_ref__in=rm)|Q(where_sighted_refs__object_id__in=rm)
                 ).values_list("object_id", flat=True)
-                sdo.object_refs.remove(*rm, *rmr, *rms)
-                sdo.save()
+                if request.user.is_authenticated():
+                    sdo.object_refs.remove(*rm, *rmr, *rms)
+                    sdo.save()
             else:
-                for i in STIXObjectID.objects.filter(object_id__in=dlist):
-                    #d = get_obj_from_id(i)
-                    i.delete()
-            messages.add_message(request, messages.SUCCESS, 'Removed.')
-            #return redirect("/stix/"+id)
+                if request.user.is_authenticated():
+                    for i in STIXObjectID.objects.filter(object_id__in=dlist):
+                        #d = get_obj_from_id(i)
+                        i.delete()
+                    messages.add_message(request, messages.SUCCESS, 'Removed.')
+                    #return redirect("/stix/"+id)
+        elif 'update_bulk' in request.POST:
+            pass
         elif 'create_bulk' in request.POST:
             bform = InputForm(request.POST)
             input = None
@@ -436,7 +446,7 @@ def sdo_view(request, id):
                 if t.name == "indicator":
                     obform = SelectObservableForm(request.POST)
                     #print(obform)
-                    if obform.is_valid():
+                    if request.user.is_authenticated() and obform.is_valid():
                         property = obform.cleaned_data["property"]
                         label = obform.cleaned_data["label"]
                         bulk_create_indicator(label,property,input,src=sdo)
@@ -490,7 +500,7 @@ def sdo_view(request, id):
                 selected = sot.name
                 soform.fields["type"].initial = sotid
                 coform = getform(sot.name, request=request)
-                if coform.is_valid():
+                if request.user.is_authenticated() and coform.is_valid():
                     saved = coform.save()
                     report = add_object_refs(sdo, saved.object_id)
                     report.save()
@@ -508,7 +518,7 @@ def sdo_view(request, id):
                         coform = getform(drs.source.name, request=request)
                         tgt = sdo.object_id
                     if coform:
-                        if coform.is_valid():
+                        if request.user.is_authenticated() and coform.is_valid():
                             saved = coform.save()
                             if saved:
                                 if not src:
@@ -528,7 +538,7 @@ def sdo_view(request, id):
 
         elif 'add_sight' in request.POST:
             asform = SightingForm(request.POST)
-            if asform.is_valid():
+            if request.user.is_authenticated() and asform.is_valid():
                 s = asform.save()
                 messages.add_message(
                     request, messages.SUCCESS, 'Updated.'
@@ -537,7 +547,7 @@ def sdo_view(request, id):
         elif 'add_obj' in request.POST:
             aoform = AddObjectForm(request.POST)
             #print(aoform)
-            if aoform.is_valid():
+            if request.user.is_authenticated() and aoform.is_valid():
                 refs = aoform.cleaned_data["objects"]
                 rel = aoform.cleaned_data["relation"]
                 #print(rel)
@@ -575,7 +585,7 @@ def sdo_view(request, id):
         elif 'update_pattern' in request.POST:
             #print(sdo.pattern)
             pform = IndicatorPatternForm(request.POST, instance=sdo.pattern)
-            if pform.is_valid():
+            if request.user.is_authenticated() and pform.is_valid():
                 obs = pform.cleaned_data["observable"]
                 new_obs = pform.cleaned_data["new_observable"]
                 gen = False

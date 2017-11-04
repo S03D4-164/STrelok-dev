@@ -103,6 +103,7 @@ $(document).ready(
         });
         datePicker();
         Tablesort(document.getElementById('obj_table'));
+        Tablesort(document.getElementById('obs_table'));
         Tablesort(document.getElementById('rel_table'));
         Tablesort(document.getElementById('sight_table'));
     }
@@ -284,15 +285,17 @@ $(document).ready(
 
 <div id="canvas-wrapper"><svg id="canvas"></svg></div>
 
-<div id="legend" class="sidebar">
+<div class="sidebar">
+<div id="legend">
 <h2>Legend</h2>
 <ul id="legend-content"></ul>
 </div>
 
-<div id="selected" class="sidebar">
+<div id="selected" >
 <h2>Selected Node</h2>
 <div id="selection"></div>
 </div><!--/#selected-->
+</div>
 
 </div><!--/.panel-body-->
 </div><!--/.panel-->
@@ -308,10 +311,11 @@ $(document).ready(
 {% if user.is_authenticated %}
 <a class="btn btn-warning btn-xs" data-toggle="modal" href="#obj_form">Edit</a>
 <a class="btn btn-danger btn-xs" data-toggle="modal" href="#delete_form">Delete</a>
+<a class="btn btn-info btn-xs" href="/stix/{{obj.object_id.object_id}}/recursive">Recursive</a>
 {% endif %}
 <br>
 <h4>
-<a href="">
+<a href="/stix/{{obj.object_id.object_id}}">
 {% if obj.name %}{{obj.name}}
 {% elif obj.value %}{{obj.value}}
 {% else %}{{obj.object_id.object_id}}
@@ -396,6 +400,9 @@ STIX
 <li ><a data-toggle="tab" href="#rel_tab">Relations</a></li>
 <li><a data-toggle="tab" href="#sight_tab">Sightings</a></li>
 <li><a data-toggle="tab" href="#obs_tab">Observables</a></li>
+{% if obj.object_type.name == "threat-actor" %}
+<li><a data-toggle="tab" href="#chart_tab">Chart</a></li>
+{% endif %}
 {% if obj.object_type.name == "report" %}
 <li><a data-toggle="tab" href="#objrefs_tab">Object Refs</a></li>
 {% endif %}
@@ -413,6 +420,11 @@ STIX
 <!--a class="btn btn-warning btn-xs" >Connect</a-->
 {% endif %}
 <div class="tab-content">
+
+{% if obj.object_type.name == "threat-actor" %}
+<div class="tab-pane" id="chart_tab" >
+</div>
+{% endif %}
 
 {% if obj.object_type.name == "report" %}
 <div class="tab-pane" id="objrefs_tab" >
@@ -444,7 +456,7 @@ STIX
 <table id="obs_table" class="table table-condensed table-stripe table-hover display" width="100%">
 <thead><tr>
 <th class="col-sm-1"> </th>
-<th >Observables</th>
+<th data-sort-default>Observables</th>
 </tr></thead>
 <tbody >
 {% for o in obs %}

@@ -239,8 +239,10 @@ def kill_chain_view(request):
     }
     return render(request, 'matrix_viz.html', c)
 
-def ttp_view(request):
+def ttp_view(request, id=None):
+    mode = "threat-actor"
     actor = []
+    campaign = []
     sot = [
         "attack-pattern",
         #"indicator",
@@ -255,18 +257,29 @@ def ttp_view(request):
         form = MatrixForm(request.POST)
         if form.is_valid():
             actor = form.cleaned_data["threat_actor"]
+            actor = actor.values_list("object_id",flat=True)
             type = form.cleaned_data["type"]
-            
+    obj = None
+    if id:
+        if id.split("--")[0] == "threat-actor":
+            mode = "campaign"
+            actor = STIXObjectID.objects.filter(object_id=id)
+        elif id.split("--")[0] == "campaign":
+            mode = "campaign"
+            campaign = STIXObjectID.objects.filter(object_id=id)
     objs = STIXObject.objects.filter(
         object_type__in=type
     )
     #a = ThreatActor.objects.all().values_list("object_id", flat=True)
     killchain = KillChainPhase.objects.all()
     data = {}
+    cdata = {}
     color = {}
     for k in killchain:
         data[k.phase_name] = {}
+        cdata[k.phase_name] = {}
         color[k.phase_name] = hashlib.md5(k.phase_name.encode("utf8")).hexdigest()[0:6]
+    clist = []
     for obj in objs:
         o = get_obj_from_id(obj.object_id)
         if o.kill_chain_phases:
@@ -277,24 +290,40 @@ def ttp_view(request):
                     relationship_type__name="uses",
                     target_ref=o.object_id,
                 )
+                if campaign:
+                    rel = rel.filter(source_ref__in=campaign)
                 c = rel.values_list("source_ref", flat=True).order_by().distinct()
                 rel = Relationship.objects.filter(
                     source_ref__in=c,
                     relationship_type__name="attributed-to",
                     target_ref__object_id__startswith="threat-actor",
-                ).values_list("target_ref", flat=True).order_by().distinct()
-                if rel:
-                    #data[kcp.phase_name][o.name] = rel
-                    data[kcp.phase_name][o] = rel
-    #kdict = {}
-    #for k,v in data.items():
-    #    kdict[k] = len(v)
-    c = {
+                    #target_ref__in=actor,
+                )
+                if actor:
+                    rel = rel.filter(target_ref__in=actor)
+                a = rel.values_list("target_ref", flat=True).order_by().distinct()
+                if a:
+                    #data[kcp.phase_name][o] = rel
+                    data[kcp.phase_name][o] = a
+                c = rel.values_list("source_ref", flat=True).order_by().distinct()
+                if c:
+                    cdata[kcp.phase_name][o] = c
+                    clist += list(c)
+
+    if mode == "campaign":
+        actor = Campaign.objects.filter(object_id__in=clist)
+        data = cdata
+    else:
+        actor = ThreatActor.objects.filter(object_id__in=actor)
+        #data = data
+    content = {
         "killchain": killchain,
-        #"kdict": kdict,
-        "actor": actor,
+        #"actor": ThreatActor.objects.filter(object_id__in=actor),
+        "actor":actor,
         "data":data,
+        #"actor":Campaign.objects.filter(object_id__in=campaign),
+        #"data":cdata,
         "color":color,
         "form":form,
     }
-    return render(request, 'ttp_view.html', c)
+    return render(request, 'ttp_view.html', content)

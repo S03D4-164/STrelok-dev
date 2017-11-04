@@ -1,10 +1,10 @@
 from django.conf.urls import url, include
 from django.contrib import admin, auth
 
-from .views.sdo import sdo_list,sdo_view
+from .views.sdo import sdo_list,sdo_view, sdo_view_recursive
 from .views.observables import obs_view
 from .views.drs import viz_drs, data_drs
-from .views.stix import stix_view ,stix2_json, stix2type_json
+from .views.stix import stix_view ,stix2_json, stix2type_json, stix2_json_masked
 from .views.taxii import taxii_discovery, taxii_collection, taxii_get_objects
 from .views.timeline import timeline_view
 from .views.chart import kill_chain_view, ttp_view, target_chart, actor_chart
@@ -41,9 +41,12 @@ urlpatterns = [
     url(r'^stix/drs/$', viz_drs),
     #url(r'^stix/matrix/$', kill_chain_view),
     url(r'^stix/matrix/$', ttp_view),
+    url(r'^stix/matrix/(?P<id>[a-z\-]+--[0-9a-f\-]+)$', ttp_view),
     url(r'^stix/(?P<id>[a-z\-]+--[0-9a-f\-]+)\.json$', stix2_json),
-    url(r'^stix/(?P<id>[a-z\-]+--[0-9a-f\-]+)', sdo_view),
+    url(r'^stix/(?P<id>[a-z\-]+--[0-9a-f\-]+)$', sdo_view),
+    url(r'^stix/(?P<id>[a-z\-]+--[0-9a-f\-]+)/recursive$', sdo_view_recursive),
     url(r'^stix/all.json$', stix2_json),
+    url(r'^stix/masked-all.json$', stix2_json_masked),
     url(r'^stix/(?P<type>[^/]+)\.json$', stix2type_json),
     url(r'^stix/(?P<type>[^/]+)', sdo_list),
     url(r'^timeline/(?P<id>[a-z\-]+--[0-9a-f\-]+)$', timeline_view),

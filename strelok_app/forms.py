@@ -143,7 +143,6 @@ class IntrusionSetForm(forms.ModelForm):
         )
         return c
 
-
 class MalwareForm(forms.ModelForm):
     class Meta:
         model = Malware
@@ -226,7 +225,6 @@ class ReportForm(forms.ModelForm):
         ]
         widgets = {
             #"labels":forms.CheckboxSelectMultiple(),
-            #"object_refs":forms.CheckboxSelectMultiple(),
         }
     def __init__(self, *args, **kwargs):
         super(ReportForm, self).__init__(*args, **kwargs)
@@ -319,8 +317,7 @@ class RelationshipForm(forms.ModelForm):
         else:
             return self.cleaned_data
 
-
-class TimelineForm(forms.Form):
+class VisForm(forms.Form):
     plot = forms.ChoiceField(choices=(
         ("point","point"),
         ("box","box"),
@@ -328,8 +325,15 @@ class TimelineForm(forms.Form):
     ),initial="point")
     stack_groups = forms.BooleanField(initial=True)
     stack_subgroups = forms.BooleanField(initial=True)
+    report = forms.BooleanField(initial=False)
     #show_minor_labels = forms.BooleanField(initial=True)
-    recursive = forms.BooleanField(initial=False)
+    def __init__(self, *args, **kwargs):
+        super(VisForm, self).__init__(*args, **kwargs)
+        self.fields["stack_groups"].required = False
+        self.fields["stack_subgroups"].required = False
+        self.fields["report"].required = False
+
+class TimelineForm(forms.Form):
     group = forms.ModelMultipleChoiceField(
         queryset=STIXObjectType.objects.filter(
             name__in=[
@@ -337,33 +341,26 @@ class TimelineForm(forms.Form):
                 "campaign",
                 "malware",
                 "threat-actor",
-                "report",
+                #"report",
             ]
         ),initial=STIXObjectType.objects.filter(name="threat-actor"),
-        #widget=forms.CheckboxSelectMultiple()
+        widget=forms.CheckboxSelectMultiple()
     )
+    recursive = forms.BooleanField(initial=False)
     def __init__(self, *args, **kwargs):
         super(TimelineForm, self).__init__(*args, **kwargs)
-        self.fields["group"].required = False
-        self.fields["stack_groups"].required = False
-        self.fields["stack_subgroups"].required = False
-        #self.fields["show_minor_labels"].required = False
         self.fields["recursive"].required = False
-
+        self.fields["group"].required = False
 
 class SightingForm(forms.ModelForm):
     observable = forms.CharField(
         widget=forms.Textarea()
     )
-    #sighting_of = forms.ModelMultipleChoiceField(
-    #    queryset = STIXObjectID.objects.all()
-    #)
     class Meta:
         model = Sighting
         fields = [
             "where_sighted_refs",
             "sighting_of_ref",
-            #"sighting_of",
             "first_seen",
             "last_seen",
             "observed_data_refs",
@@ -504,7 +501,6 @@ class TypeSelectForm(forms.Form):
         self.fields["relation"].required = False
         self.fields["icon"].required = False
 
-
 class InputForm(forms.Form):
     input = forms.CharField(
         widget=forms.Textarea()
@@ -512,7 +508,7 @@ class InputForm(forms.Form):
 
 has_killchain = [                          
     "attack-pattern",                            
-    "indicator",    
+    #"indicator",    
     "malware",      
     "tool",         
 ]
@@ -520,14 +516,8 @@ has_killchain = [
 class MatrixForm(forms.Form):
     type = forms.ModelMultipleChoiceField(
         queryset=STIXObjectType.objects.filter(
-            name__in=[                          
-                "attack-pattern",                            
-                "indicator",    
-                "malware",      
-                "tool",         
-            ]
-        )
-        #),widget=forms.CheckboxSelectMultiple(attrs={"checked":""})
+            name__in=has_killchain
+        ),initial=STIXObjectType.objects.filter(name__in=has_killchain)
     )
     threat_actor = forms.ModelMultipleChoiceField(
         queryset=ThreatActor.objects.all()
