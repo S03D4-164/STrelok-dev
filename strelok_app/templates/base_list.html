@@ -1,9 +1,8 @@
 {% extends "base.html" %}
-
 {% block title %}<title>{{type|capfirst}}</title>{% endblock %}
-{% block tablesortlib %}{% endblock %}
-{% block visjslib %}{% endblock %}
+{% block tablesortlib %}{% endblock %}{% block visjslib %}{% endblock %}
 {% block jquery %}
+<script type="text/javascript" src="/static/js/bindpicker.js"></script>
 {% if type == "threat-actor" or type == "identity" %}
 <script type="text/javascript" src="/static/highcharts/highcharts.js"></script>
 <script type="text/javascript" src="/static/highcharts/modules/data.js"></script>
@@ -44,17 +43,9 @@ function drawActorChart(prop){
 $(document).ready(
     function(){
         getDataTable("{{type}}");
-        $('#id_published').datetimepicker({format:'Y-m-d H:i'});
-        $('#id_first_seen').datetimepicker({format:'Y-m-d H:i'});
-        $('#id_last_seen').datetimepicker({format:'Y-m-d H:i'});
-        $('#id_valid_from').datetimepicker({format:'Y-m-d H:i'});
-        $('#id_valid_until').datetimepicker({format:'Y-m-d H:i'});
-        $('#id_first_observed').datetimepicker({format:'Y-m-d H:i'});
-        $('#id_last_observed').datetimepicker({format:'Y-m-d H:i'});
-        {% if type == "threat-actor" %}
-        drawActorChart('sector');
-        {% elif type == "identity" %}
-        drawTgtChart('sector');
+        bindPicker();
+        {% if type == "threat-actor" %}drawActorChart('label');
+        {% elif type == "identity" %}drawTgtChart('label');
         {% endif %}
     }
 );
@@ -153,11 +144,13 @@ $(document).ready(
 <div id="container" style="height:60vh"></div>
 Refresh Chart:
 {% if type == "threat-actor" %}
-<a class="btn btn-default btn-xs" onclick=drawActorChart('sector')>Sector</a>
 <a class="btn btn-default btn-xs" onclick=drawActorChart('label')>Label</a>
+<a class="btn btn-default btn-xs" onclick=drawActorChart('lalias')>Label(Alias)</a>
+<a class="btn btn-default btn-xs" onclick=drawActorChart('sector')>Sector</a>
 {% elif type == "identity" %}
-<a class="btn btn-default btn-xs" onclick=drawTgtChart('sector')>Sector</a>
 <a class="btn btn-default btn-xs" onclick=drawTgtChart('label')>Label</a>
+<a class="btn btn-default btn-xs" onclick=drawTgtChart('lalias')>Label(Alias)</a>
+<a class="btn btn-default btn-xs" onclick=drawTgtChart('sector')>Sector</a>
 {% endif%}
 </div></div></div>
 {% endif %}

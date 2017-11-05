@@ -32,9 +32,14 @@ def stix2_json(request, id=None, mask=None):
     return HttpResponse(j,  content_type="application/json")
 
 def stix2type_json(request, type):
+    mask = None
+    if not mask and request.user.is_authenticated():
+        mask = False
+    else:
+        mask = True
     m = get_model_from_type(type)
     a = m.objects.all()
-    bundle = stix_bundle(a)
+    bundle = stix_bundle(a, mask=mask)
     j = json.dumps(json.loads(str(bundle)), indent=2)
     return HttpResponse(j,  content_type="application/json")
 
@@ -290,7 +295,6 @@ def stix2_db(obj):
             i.save()
             return i
 
-
 def stix2killchain(obj):
     kcps = []
     for k in obj.kill_chain_phases.all():
@@ -310,9 +314,6 @@ def stix_bundle(objs, mask=True):
         if not mask and hasattr(obj, "description"):
             dscr = obj.description
         if obj.object_type.name == 'attack-pattern':
-            #dscr = obj.description
-            #if mask:
-            #    dscr = ""
             a = stix2.AttackPattern(
                 id=oid,
                 name=obj.name,
@@ -323,9 +324,6 @@ def stix_bundle(objs, mask=True):
             )
             objects += (a,)
         elif obj.object_type.name == 'campaign':
-            #dscr = obj.description
-            #if mask:
-            #    dscr = ""
             c = stix2.Campaign(
                 id=oid,
                 name=obj.name,
@@ -338,9 +336,6 @@ def stix_bundle(objs, mask=True):
             )
             objects += (c,)
         elif obj.object_type.name == 'course-of-action':
-            #dscr = obj.description
-            #if mask:
-            #    dscr = ""
             c = stix2.CourseOfAction(
                 id=oid,
                 name=obj.name,
@@ -351,15 +346,16 @@ def stix_bundle(objs, mask=True):
             objects += (c,)
         elif obj.object_type.name == 'identity':
             name = obj.name
-            #dscr=obj.description
             if mask:
                 name = oid
                 label = obj.labels.all()
                 if label.count() >=1:
-                    name = str(obj.id) + '-' + label[0].value
-                #dscr=""
+                    name = str(obj.id)
+                    if label[0].alias:
+                        name += '-' + label[0].alias
+                    else:
+                        name += '-' + label[0].value
             i = stix2.Identity(
-                #id=obj.object_id.object_id,
                 id=oid,
                 name=name,
                 identity_class=obj.identity_class,
@@ -387,9 +383,6 @@ def stix_bundle(objs, mask=True):
             )
             objects += (i,)
         elif obj.object_type.name == 'intrusion-set':
-            #dscr = obj.description
-            #if mask:
-            #    dscr = ""
             i = stix2.IntrusionSet(
                 id=oid,
                 name=obj.name,
@@ -402,9 +395,6 @@ def stix_bundle(objs, mask=True):
             )
             objects += (i,)
         elif obj.object_type.name == 'malware':
-            #dscr = obj.description
-            #if mask:
-            #    dscr = ""
             m = stix2.Malware(
                 id=oid,
                 name=obj.name,
@@ -448,9 +438,6 @@ def stix_bundle(objs, mask=True):
             created_by = None
             if obj.created_by_ref:
                 created_by=obj.created_by_ref.object_id
-            #dscr = obj.description
-            #if mask:
-            #    dscr = ""
             r = stix2.Report(
                 id=oid,
                 labels=[str(l.value) for l in obj.labels.all()],
@@ -464,9 +451,6 @@ def stix_bundle(objs, mask=True):
             )
             objects += (r,)
         elif obj.object_type.name == 'threat-actor':
-            #dscr = obj.description
-            #if mask:
-            #    dscr = ""
             t = stix2.ThreatActor(
                 id=oid,
                 name=obj.name,
@@ -478,9 +462,6 @@ def stix_bundle(objs, mask=True):
             )
             objects += (t,)
         elif obj.object_type.name == 'tool':
-            #dscr = obj.description
-            #if mask:
-            #    dscr = ""
             t = stix2.Tool(
                 id=oid,
                 name=obj.name,
@@ -492,9 +473,6 @@ def stix_bundle(objs, mask=True):
             )
             objects += (t,)
         elif obj.object_type.name == 'vulnerability':
-            #dscr = obj.description
-            #if mask:
-            #    dscr = ""
             v = stix2.Vulnerability(
                 id=oid,
                 name=obj.name,
@@ -504,9 +482,6 @@ def stix_bundle(objs, mask=True):
             )
             objects += (v,)
         elif obj.object_type.name == 'relationship':
-            #dscr = obj.description
-            #if mask:
-            #    dscr = ""
             r = stix2.Relationship(
                 id=oid,
                 relationship_type=obj.relationship_type.name,

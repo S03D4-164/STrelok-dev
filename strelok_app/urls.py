@@ -7,7 +7,7 @@ from .views.drs import viz_drs, data_drs
 from .views.stix import stix_view ,stix2_json, stix2type_json, stix2_json_masked
 from .views.taxii import taxii_discovery, taxii_collection, taxii_get_objects
 from .views.timeline import timeline_view
-from .views.chart import kill_chain_view, ttp_view, target_chart, actor_chart
+from .views.chart import kill_chain_view, ttp_view, target_chart, actor_chart, chart_view
 from .tables import *
 
 from two_factor.admin import AdminSiteOTPRequired
@@ -36,6 +36,7 @@ urlpatterns = [
     url(r'^data/drs/$', data_drs),
     url(r'^chart/target/(?P<cnt_by>[a-z]+)$', target_chart),
     url(r'^chart/threat-actor/(?P<cnt_by>[a-z]+)$', actor_chart),
+    url(r'^chart/(?P<id>[a-z\-]+--[0-9a-f\-]+)/(?P<cnt_by>[a-z]+)$', chart_view),
     #url(r'^data/timeline/$', data_timeline),
     url(r'^stix/$', stix_view),
     url(r'^stix/drs/$', viz_drs),

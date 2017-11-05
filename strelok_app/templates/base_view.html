@@ -1,15 +1,20 @@
 {% extends "base.html" %}
-
 {% block title %}<title>{{type|capfirst}}:
 {% if obj.name %}{{obj.name}}
 {% elif obj.value %}{{obj.value}}
 {% else %}{{obj.object_id.object_id}}
 {% endif %}
 </title>{% endblock %}
-
 {% block datatableslib %}{% endblock %}{% block visjslib %}{% endblock %}
 {% block jquery %}
 <link rel="stylesheet" type="text/css" href="/static/stixviz/app.css" /> 
+<script type="text/javascript" src="/static/js/bindpicker.js"></script>
+{% if obj.object_type.name == "threat-actor" %}
+<script type="text/javascript" src="/static/highcharts/highcharts.js"></script>
+<script type="text/javascript" src="/static/highcharts/modules/data.js"></script>
+<script type="text/javascript" src="/static/highcharts/modules/drilldown.js"></script>
+<script type="text/javascript" src="/static/js/chart_tgt.js"></script>
+{% endif %}
 <script>
 function detachObject(){
     var id = [];
@@ -31,10 +36,14 @@ function detachObject(){
         });
     };
 };
-function datePicker(){
-        $('input#id_published').datetimepicker({format:'Y-m-d H:i'});
-        $('input#id_first_seen').datetimepicker({format:'Y-m-d H:i'});
-        $('input#id_last_seen').datetimepicker({format:'Y-m-d H:i'});
+function actorTgtChart(prop, id){
+    $.ajax({
+        type: 'GET',
+        url: '/chart/' + id + '/' + prop,
+        success: function(data){
+            tgtChart(data, prop);
+        },
+    });
 };
 $(document).ready(
     function(){
@@ -65,7 +74,7 @@ $(document).ready(
                         cform = $(result).find("#create_object");
                         $("#create_object").replaceWith(cform);
                     };
-                    datePicker();
+                    bindPicker();
                 }
             });
         });
@@ -97,22 +106,24 @@ $(document).ready(
                         console.log(table);
                         $("tbody#objects_table").replaceWith(table);
                     };
-                    datePicker();
+                    bindPicker();
                 }
             });
         });
-        datePicker();
+        bindPicker();
         Tablesort(document.getElementById('obj_table'));
         Tablesort(document.getElementById('obs_table'));
         Tablesort(document.getElementById('rel_table'));
         Tablesort(document.getElementById('sight_table'));
+        {% if obj.object_type.name == "threat-actor" %}
+        actorTgtChart("label", "{{obj.object_id.object_id}}");
+        {% endif %}
     }
 );
 </script>
 {% endblock%}
 
 {% block container %}
-
 {% if user.is_authenticated %}
 {% block modal_delete %}
 <div class="modal" id="delete_form" role="dialog">
@@ -423,6 +434,10 @@ STIX
 
 {% if obj.object_type.name == "threat-actor" %}
 <div class="tab-pane" id="chart_tab" >
+<div id="container" style="height:60vh"></div>
+<a class="btn btn-default btn-xs" onclick=actorTgtChart("label","{{obj.object_id.object_id}}")>Label</a>
+<a class="btn btn-default btn-xs" onclick=actorTgtChart("lalias","{{obj.object_id.object_id}}")>Label(Alias)</a>
+<a class="btn btn-default btn-xs" onclick=actorTgtChart("sector","{{obj.object_id.object_id}}")>Sector</a>
 </div>
 {% endif %}
 

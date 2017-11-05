@@ -334,21 +334,7 @@ def sdo_view(request, id, recursive=False):
     sights = []
     observables = []
 
-    stix = {}
     stix = stix_bundle(objs, mask=mask)
-    """
-    try:
-        if "objects" in stix:
-            for o in stix["objects"]:
-                if o.type == "relationship":
-                    rels.append(o)
-                elif o.type == "sighting":
-                    sights.append(o)
-                else:
-                    objects.append(o)
-    except Exception as e:
-        stix = str(e)
-    """
 
     for o in objs:
         if o.object_type.name == "relationship":
@@ -421,7 +407,8 @@ def sdo_view(request, id, recursive=False):
                 rms = Sighting.objects.filter(
                     object_id__in=sdo.object_refs.all()
                 ).filter(
-                    Q(sighting_of_ref__in=rm)|Q(where_sighted_refs__object_id__in=rm)
+                    Q(sighting_of_ref__in=rm)|\
+                    Q(where_sighted_refs__object_id__in=rm)
                 ).values_list("object_id", flat=True)
                 if request.user.is_authenticated():
                     sdo.object_refs.remove(*rm, *rmr, *rms)

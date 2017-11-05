@@ -512,12 +512,16 @@ has_killchain = [
     "malware",      
     "tool",         
 ]
+type_has_killchain = STIXObjectType.objects.filter(name__in=has_killchain)
 
 class MatrixForm(forms.Form):
     type = forms.ModelMultipleChoiceField(
-        queryset=STIXObjectType.objects.filter(
-            name__in=has_killchain
-        ),initial=STIXObjectType.objects.filter(name__in=has_killchain)
+        queryset=type_has_killchain,
+        initial=type_has_killchain,
+        #widget=forms.CheckboxSelectMultiple()
+    )
+    campaign = forms.ModelMultipleChoiceField(
+        queryset=Campaign.objects.all()
     )
     threat_actor = forms.ModelMultipleChoiceField(
         queryset=ThreatActor.objects.all()
@@ -533,6 +537,7 @@ class MatrixForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super(MatrixForm, self).__init__(*args, **kwargs)
         self.fields["threat_actor"].required = False
+        self.fields["campaign"].required = False
         self.fields["type"].required = False
 
 

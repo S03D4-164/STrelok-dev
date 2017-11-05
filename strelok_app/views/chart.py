@@ -13,7 +13,6 @@ def actor_chart(request, cnt_by='sector'):
     #tgt = Identity.objects.filter(object_id__in=sights.values("where_sighted_refs"))
     rels = Relationship.objects.all()
     data = cnt_actor_from_tgt(tgt, rels, sights, drilldown=True)
-    #print(data)
     dataset = []
     for d in data:
         dd = cnt_tgt_by_prop(tgt=d["tgt"], cnt_by=cnt_by, drilldown=False)
@@ -76,7 +75,7 @@ def cnt_actor_from_tgt(tgt, rels, sights, drilldown=False):
     )
     if unidentified:
         ai = {
-            "name":"Unknown",
+            "name":"Unidentified",
             "y":len(unidentified),
         }
         if drilldown:
@@ -87,6 +86,15 @@ def cnt_actor_from_tgt(tgt, rels, sights, drilldown=False):
 def target_chart(request, cnt_by="sector"):
     data = cnt_tgt_by_prop(cnt_by=cnt_by)
     return HttpResponse(json.dumps(data, indent=2),  content_type="application/json")
+
+def chart_view(request, id, cnt_by="sector"):
+    soid = STIXObjectID.objects.get(object_id=id)
+    obj = get_obj_from_id(soid)
+    dataset = []
+    if obj.object_type.name == "threat-actor":
+        dataset = cnt_tgt_by_prop(cnt_by=cnt_by, actor_name=obj.name)
+    dataset = json.dumps(dataset,indent=2)
+    return HttpResponse(dataset,  content_type="application/json")
 
 def cnt_tgt_by_prop(cnt_by="sector", actor_name=None, drilldown=True, tgt=None):
     dataset = []
@@ -122,14 +130,17 @@ def cnt_tgt_by_prop(cnt_by="sector", actor_name=None, drilldown=True, tgt=None):
             category = None
             if cnt_by == "sector":
                 category = t.sectors.all()
-            elif cnt_by == "label":
+            elif cnt_by in ["label", "lalias"]:
                 category = t.labels.all()
             if category:
                 for c in category:
-                    if not c.value in prop:
-                        prop[c.value] = [t]
+                    value = c.value
+                    if cnt_by == "lalias" and c.alias:
+                        value = c.alias
+                    if not value in prop:
+                        prop[value] = [t]
                     else:
-                        prop[c.value].append(t)
+                        prop[value].append(t)
             else:
                 noprop["y"].append(t)
     for k,v in prop.items():
@@ -249,16 +260,19 @@ def ttp_view(request, id=None):
         "malware",
         "tool",
     ]
-    type = STIXObjectType.objects.filter(
-        name__in=sot
-    )
+    type = STIXObjectType.objects.filter(name__in=sot)
     form = MatrixForm()
     if request.method == "POST":
         form = MatrixForm(request.POST)
         if form.is_valid():
             actor = form.cleaned_data["threat_actor"]
-            actor = actor.values_list("object_id",flat=True)
+            if actor:
+                actor = actor.values_list("object_id",flat=True)
             type = form.cleaned_data["type"]
+            campaign = form.cleaned_data["campaign"]
+            if campaign:
+                campaign = campaign.values_list("object_id",flat=True)
+                mode = "campaign"
     obj = None
     if id:
         if id.split("--")[0] == "threat-actor":
@@ -267,9 +281,7 @@ def ttp_view(request, id=None):
         elif id.split("--")[0] == "campaign":
             mode = "campaign"
             campaign = STIXObjectID.objects.filter(object_id=id)
-    objs = STIXObject.objects.filter(
-        object_type__in=type
-    )
+    objs = STIXObject.objects.filter(object_type__in=type)
     #a = ThreatActor.objects.all().values_list("object_id", flat=True)
     killchain = KillChainPhase.objects.all()
     data = {}
@@ -318,11 +330,8 @@ def ttp_view(request, id=None):
         #data = data
     content = {
         "killchain": killchain,
-        #"actor": ThreatActor.objects.filter(object_id__in=actor),
         "actor":actor,
         "data":data,
-        #"actor":Campaign.objects.filter(object_id__in=campaign),
-        #"data":cdata,
         "color":color,
         "form":form,
     }
