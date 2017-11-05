@@ -104,7 +104,8 @@ def sight2db(sight, objs):
         elif s.count() == 1:
             s = s[0]
         for od in ods:
-            s.observed_data_refs.add(od)
+            if od:
+                s.observed_data_refs.add(od)
         for wsr in wsrs:
             s.where_sighted_refs.add(wsr)
         s.save()
@@ -636,13 +637,14 @@ def stix_view(request):
                     b = stix_filter(json.loads(j), b, types=types, relation=relation)
                 c = {
                     "stix":json.dumps(b, indent=2),
+                    "bundle":b,
                 }
-                return render(request, 'stix_viz.html', c)
+                return render(request, 'stix_view.html', c)
     c = {
         "form":form,
         "tform":tform,
     }
-    return render(request, 'stix_view.html', c)
+    return render(request, 'parse_view.html', c)
 
 def stix_filter(j, b, types=[], relation=[]):
     #j = res.json()

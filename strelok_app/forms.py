@@ -682,7 +682,7 @@ class SelectObservableForm(forms.Form):
 
 def get_model_from_type(type):
     name = ""
-    for i in type.split("-")[0:2]:
+    for i in type.split("-"):
         name += i.capitalize()
     m = getattr(mymodels, name)
     return m
